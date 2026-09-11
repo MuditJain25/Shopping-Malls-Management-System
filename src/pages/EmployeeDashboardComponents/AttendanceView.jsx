@@ -1,9 +1,8 @@
-import React from "react";
 import { useState } from "react";
-import { LogIn,LogOut } from "lucide-react";
-import { PageHeader, StatCard, DataTable, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
+import { LogIn, LogOut, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { PageHeader, DataTable, Badge } from '@/components/ui/index.jsx';
 
-import { getAttendanceByEmployee } from '@/lib/mockData.js';
+import { getAttendanceByEmployee, attendanceRecords } from '@/lib/mockData.js';
 
 export default function AttendanceView({ empId }) {
   const records = getAttendanceByEmployee(empId);
