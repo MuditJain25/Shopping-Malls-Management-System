@@ -79,7 +79,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center">
               <ShoppingBag size={18} className="text-white" />
             </div>
-            <span className="font-bold text-base text-slate-900">MallHub</span>
+            <span className="font-bold text-base text-slate-900">Shopping Malls Management System</span>
           </div>
           <div className="hidden md:flex items-center gap-1">
             <button onClick={() => { setView('home'); setSelectedMall(null); }} className="px-3 py-1.5 text-sm text-slate-600 hover:text-brand-600">Discover</button>
@@ -180,7 +180,7 @@ export default function LandingPage() {
 
           <footer className="bg-slate-800 text-slate-400 py-6">
             <div className="max-w-6xl mx-auto px-4 text-center text-xs">
-              <p>MallHub — Mall Management Platform.</p>
+              <p> Mall Management Platform.</p>
             </div>
           </footer>
         </>

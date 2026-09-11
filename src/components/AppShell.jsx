@@ -98,7 +98,7 @@ export default function AppShell({ children }) {
             <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center">
               <ShoppingBag size={18} className="text-white" />
             </div>
-            <h1 className="font-bold text-base text-slate-900">MallHub</h1>
+            <h1 className="font-bold text-base text-slate-900">Shopping Malls Management System</h1>
           </div>
         </div>
 
