@@ -6,19 +6,19 @@ import { ErrorState } from '@/components/ui/index.jsx';
 
 const ROLE_DASHBOARDS = {
   customer: '/app/customer',
-  // tenant: '/app/tenant',
-  // shop_manager: '/app/shop-manager',
-  // mall_manager: '/app/mall-manager',
-  // executive: '/app/executive',
+  tenant: '/app/tenant',
+  shop_manager: '/app/shop-manager',
+  mall_manager: '/app/mall-manager',
+  executive: '/app/executive',
   employee: '/app/employee',
 };
 
 const DEMO_ACCOUNTS = [
   { role: 'Customer', email: 'customer@demo.com', password: 'demo123' },
-  // { role: 'Tenant', email: 'tenant@demo.com', password: 'demo123' },
-  // { role: 'Shop Manager', email: 'shopmgr@demo.com', password: 'demo123' },
-  // { role: 'Mall Manager', email: 'mallmgr@demo.com', password: 'demo123' },
-  // { role: 'Executive', email: 'exec@demo.com', password: 'demo123' },
+  { role: 'Tenant', email: 'tenant@demo.com', password: 'demo123' },
+  { role: 'Shop Manager', email: 'shopmgr@demo.com', password: 'demo123' },
+  { role: 'Mall Manager', email: 'mallmgr@demo.com', password: 'demo123' },
+  { role: 'Executive', email: 'exec@demo.com', password: 'demo123' },
   { role: 'Employee', email: 'employee@demo.com', password: 'demo123' },
 ];
 
@@ -62,7 +62,7 @@ export default function AuthPage({ mode: initialMode }) {
           <div className="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center">
             <ShoppingBag size={20} className="text-white" />
           </div>
-          <h1 className="font-bold text-lg text-slate-900">Shopping Malls Management System</h1>
+          <h1 className="font-bold text-lg text-slate-900">MallHub</h1>
         </div>
 
         <div className="card p-6">
