@@ -1,4 +1,4 @@
-# Shopping Malls Management — Spring Boot Backend — Design (v2.0, Google-Auth revision)
+# Shopping Malls Management — Spring Boot Backend — Design (v2.1, Google-Auth revision)
 
 > Status: **DESIGN FROZEN FOR REVIEW — NO CODE YET**
 > Constraints: `frontend/*` untouched. `database/mall_schema.sql` untouched (source of truth).
@@ -15,19 +15,20 @@
 | D-AUTH | No password auth. Google login only. No `password_hash`, no email/password signup/login. |
 | D-IDS | All PK/FK IDs are `INT` (not BIGINT, not VARCHAR). `AUTO_INCREMENT` via JPA `IDENTITY`. |
 | D-MALL-COLS | Add `Mall.image_url`, `Mall.description` (required — present in mock, absent in schema). |
-| D-LISTING | Keep `Store.listing_media` as a single column (no new table). See §6-D2 for adapter + length fix. |
+| D-LISTING | `Store.listing_media` is ONE single image URL string (no array, no new table). See §6-D2. v2.1 revision: single-URL per user answer. |
 | D-TOSHOW | `Store_Sells_Product.to_show` is `BOOLEAN`. |
-| D-REVENUE | No `Revenue_Information` schema change now. Amount/month persistence deferred (see §16-Pending). |
+| D-REVENUE | `Revenue_Information` UNCHANGED + revenue endpoints DEFERRED entirely (pending, not even accept-but-ignore). See §16-P2. |
 | D-TXN | `Financial_Transaction.sender/receiver` stay `VARCHAR` (no FK). But `sender_type/receiver_type` must be added (missing in schema, present in mock). |
-| D-EMP-MALL | `Employee.mall_id` added, `NOT NULL`. |
-| D-MGR-MALL | `Mall_Manager.mall_id` is `NOT NULL` (manager must belong to a mall). |
+| D-EMP-MALL | `Employee.mall_id` added, `NOT NULL`, `ON DELETE RESTRICT` (confirmed). |
+| D-MGR-MALL | `Mall_Manager.mall_id` is `NOT NULL` (manager must belong to a mall), `ON DELETE RESTRICT` (confirmed). |
+| D-STORE-MALL | `Store.mall_id` is `NOT NULL`, `ON DELETE RESTRICT` (confirmed v2.1). |
 | D-FINAL | `Bid_Event.final_allocation BOOLEAN` kept as-is for now (committed schema). Workaround in §6-D10. |
 | D-BIDPK | `Bid` composite PK `(user_id, bid_id)` + composite FK `(store_id, event_id)` kept as-is (committed). Workarounds in §6-D11. |
 | D-PROD-IMG | Add `Product.image_url`. |
 | D-PAGING | All list endpoints support pagination (`page/size/sort`). Backward-compat: unpaged array by default (see §11). |
 | D-ANALYTICS | No analytics endpoint for MVP. Deferred. |
 | D-MEDIA | Image/media are external URLs only (Pexels). No upload endpoint. |
-| D-DISCOUNT | `Discount_Offer` entity needed (CRUD minimal). |
+| D-DISCOUNT | `Discount_Offer` entity needed (full CRUD: GET/POST/PUT/DELETE, confirmed v2.1). |
 | D-OVERSEES | `EE_Oversees_Mall` needed (`GET /executives/{id}/malls`). |
 | D-CORS | Dev origin `http://localhost:5173`. Prod TBD. |
 | D-EXEC | No public executive creation. Seed demo executives only. `shop_manager` inferred from `Employee.current_designation = 'Shop Manager'`. |
@@ -128,7 +129,7 @@ backend/
         UserResponse.java            // { id, email, role, first_name, last_name, profile_id, profile_type }
         AuthResponse.java            // { token, user }
         MallResponse.java            // mall_id, mall_area_sqft, opening_date, street, city, state, pincode, latitude, longitude, contact_numbers[], image_url, description
-        StoreResponse.java           // store_id, shop_number, floor, area_sqft, store_name, status, listing_media[], mall_id
+        StoreResponse.java           // store_id, shop_number, floor, area_sqft, store_name, status, listing_media (single URL string), mall_id
         ProductResponse.java         // product_id, product_name, category, price, image_url, to_show (nullable unless in store context), store (nullable for top-selling)
         BidEventResponse.java        // event_id, store_id, start_date, end_date, status, minimum_bid_amount, minimum_bid_increment, final_allocation (boolean for now), winning_bid (derived, nullable)
         BidResponse.java             // bid_id, user_id, event_id, store_id, bid_amount, round_number, bid_date, status, bidder_name
@@ -168,15 +169,16 @@ backend/
     AuthServiceTest, BidServiceTest (concurrency), AttendanceServiceTest, MallControllerTest
 ```
 
-Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO diverges (Store↔listing_media split, Mall↔contact_numbers, BidEvent↔winning_bid).
+Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO diverges (Mall↔contact_numbers, BidEvent↔winning_bid).
 
 ---
 
 ## 5. Domain model (INT ids, deltas applied conceptually)
 
 - `Mall(mall_id INT AI PK, mall_area_sqft FLOAT, opening_date DATE, street, city, state, pincode, latitude FLOAT, longitude FLOAT, image_url VARCHAR(1000), description TEXT)` + `MallContactNumber(mall_id FK, contact_number)` 1:N.
-- `Store(store_id INT AI PK, shop_number VARCHAR(20), floor INT, area_sqft FLOAT, store_name, status VARCHAR(20) [occupied|available], listing_media VARCHAR(2000) delimited, mall_id INT NOT NULL FK→Mall ON DELETE RESTRICT)`.
+- `Store(store_id INT AI PK, shop_number VARCHAR(20), floor INT, area_sqft FLOAT, store_name, status VARCHAR(20) [occupied|available], listing_media VARCHAR(1000) single image URL, mall_id INT NOT NULL FK→Mall ON DELETE RESTRICT)`.
   - `shop_number` MUST be VARCHAR: mock uses `G-12`, `F2-08` — INT cannot store these. This is not an "ID" so D-IDS does not apply.
+  - `listing_media` v2.1: SINGLE URL string (not array). Seed picks `listing_media[0]` from mock arrays. Frontend `listing_media[0]` indexing will need a one-line change at integration (string vs array) — documented break, accepted.
 - `Product(product_id INT AI PK, product_name, category, price DECIMAL(10,2), image_url VARCHAR(1000))`.
 - `StoreProduct(store_id FK, product_id FK, to_show BOOLEAN NOT NULL DEFAULT FALSE, PK(store_id,product_id))`.
 - `Tenant(tenant_id INT AI PK, business_name, business_type, email UNIQUE, date_registered DATE, phone_number)` + `StoreTenant(store_id, tenant_id, PK both)` M:N.
@@ -205,12 +207,12 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
   ```sql
   ALTER TABLE Mall ADD COLUMN image_url VARCHAR(1000) NULL, ADD COLUMN description TEXT NULL;
   ```
-- **D2 — Store.listing_media length + adapter (required, D-LISTING).**
-  Why not just keep `VARCHAR(500)`: 3 Pexels URLs ≈ 110–140 chars each → 350–450 chars joined; borderline overflow → silent truncate (non-strict mode) = broken `<img>`, or hard error (strict mode) = failed insert. Also frontend expects JSON **array** (`property.listing_media[0]` in `BidPage.jsx:65`, `Properties.jsx:30`, `StoresView.jsx:14`); a raw string would make `[0]` return the first character.
-  Fix without new table: store ONE delimited string, expose array in DTO via split/join.
+- **D2 — Store.listing_media single URL (revised v2.1, DECIDED).**
+  Per user answer: ONE image URL per store (the listing image shown during bidding). No array, no delimiter, no extra table.
   ```sql
-  ALTER TABLE Store MODIFY COLUMN listing_media VARCHAR(2000) NULL;
-  -- Convention: '|' delimited, no commas (URLs contain ?&= but never '|' unencoded). Backend splits on '|' on read, joins on write.
+  ALTER TABLE Store MODIFY COLUMN listing_media VARCHAR(1000) NULL;
+  -- Stores ONE URL. Seed uses mock listing_media[0]. DTO exposes a plain string (not array).
+  -- Known break: frozen frontend does listing_media[0] (expects array). At integration, change to direct string use.
   ```
 - **D3 — Store.shop_number type (required, BLOCKER).** Mock uses `G-12`, `F2-08`, `F3-03` — `INT` cannot store these; every seed insert would fail.
   ```sql
@@ -236,6 +238,11 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
   -- Replace FK: DROP FOREIGN KEY … ON DELETE SET NULL; ADD CONSTRAINT fk_mgr_mall FOREIGN KEY (mall_id) REFERENCES Mall(mall_id) ON DELETE RESTRICT;
   -- RESTRICT (not CASCADE) so deleting a mall cannot silently wipe manager accounts; operator must reassign first.
   ```
+- **D7b — Store.mall_id NOT NULL (required, D-STORE-MALL, confirmed v2.1).**
+  ```sql
+  ALTER TABLE Store MODIFY COLUMN mall_id INT NOT NULL;
+  -- Replace FK: DROP FOREIGN KEY … ON DELETE SET NULL; ADD CONSTRAINT fk_store_mall FOREIGN KEY (mall_id) REFERENCES Mall(mall_id) ON DELETE RESTRICT;
+  ```
 - **D8 — User.google_sub (required for Google auth, minimal).** No password column ever added.
   ```sql
   ALTER TABLE User ADD COLUMN google_sub VARCHAR(255) NULL UNIQUE;
@@ -258,6 +265,7 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
   3. JPA mapping is verbose (`@EmbeddedId BidId(userId,bidId)` + composite `@ManyToOne` to `BidEvent`) — larger bug surface, slower joins.
   4. Ordering/pagination by `bid_id` alone is meaningless without `user_id`.
   Mitigation in V1 (no PK change): app-level `bid_id` sequence (max+1 or AUTO_INCREMENT surrogate emulated in service with `@Transactional` + unique index), always resolve `store_id` from event, expose `bid_id` as the public handle and keep `user_id` internal. Pending (not in V1): `ALTER TABLE Bid ADD UNIQUE (bid_id)` + eventual surrogate PK migration.
+  - Manual DB inserts (D6-bypass, user-confirmed for checking/seed): SELECTs are always safe. INSERTs bypassing the API MUST use reserved high IDs (`>= 90000` for `bid_id/request_id/record_id/offer_id/information_id/event_id`, documented in `V2__seed.sql` header) so `MAX+1` generation never collides. Prefer seed-file inserts at start + API writes after; raw low-ID inserts will cause duplicate-key errors under concurrent API use.
 - **D12 — AUTO_INCREMENT for inserts.** Committed schema declares `INT PRIMARY KEY` without autoincrement; JPA `@GeneratedValue(IDENTITY)` requires it.
   ```sql
   -- For each singleton-PK table (Mall, Store, Product, Tenant, Employee, Mall_Manager, Enterprise_Executive, User, Financial_Transaction):
@@ -277,7 +285,7 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
 
 - Global Jackson `PropertyNamingStrategy.SNAKE_CASE`; dates `yyyy-MM-dd`, datetimes ISO-8601, times `HH:mm` (matches `BidPage`, `AttendanceView` parsing).
 - IDs are JSON numbers (`INT`) — see §14-BREAK for frontend impact.
-- `StoreResponse.listing_media`: JSON array (split on `|` from entity string).
+- `StoreResponse.listing_media`: plain STRING (single URL) per v2.1. Frontend `[0]` indexing must change at integration.
 - `MallResponse.contact_numbers`: JSON array (from `Mall_Contact_Number`).
 - `TenantResponse.store_ids`: JSON array (from `StoreTenant` join).
 - `ExecutiveResponse.oversees_mall_ids`: JSON array (from `EE_Oversees_Mall`).
@@ -307,6 +315,13 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
 - Method security: `@PreAuthorize("hasRole('EXECUTIVE')")` for `POST /managers`; `hasAnyRole('MALL_MANAGER','EXECUTIVE')` for tenant create/delete, finalize; `hasAnyRole('TENANT','MALL_MANAGER')` for employee write; self-or-manager checks in service (not just annotation) for payroll/attendance/leave.
 - CORS: `allowedOrigins=${app.cors.allowed-origins:http://localhost:5173}`, `allowedHeaders=*`, `methods=GET,POST,PUT,PATCH,DELETE,OPTIONS`, no credentials (Bearer, not cookies).
 
+**Demo mode — login disabled (2-day project update, NOT final):**
+- Goal: demo without GCP OAuth setup. No `GOOGLE_CLIENT_ID` needed.
+- Profile `demo`: `app.auth.enabled=false`. `SecurityConfig` permits ALL `/api/**` (no JWT check). `JwtAuthFilter` logs but never rejects.
+- `POST /api/auth/google` accepts `{ "email": "<placeholder>" }` (no `id_token` verification) and returns role-derived `{token,user}` with `token=demo-token-<role>` (opaque, unauthenticated). `GET /api/auth/me` accepts `?email=` for the same stub. Any unknown email → `customer` (auto-created `User` row as in §8.4).
+- Method-security annotations are relaxed to permit-all under `demo` (single `@Profile("!demo")` guard on the method-security config, not per controller — one switch).
+- ponytail: demo mode is insecure by design (no identity proof). NEVER deploy beyond localhost demo. Final build uses profile `dev/prod` with `app.auth.enabled=true` and real `GoogleTokenVerifier`; the stub class stays but is inactive outside `demo` (upgrade path: delete `DemoAuthController` before final submission if required by evaluator).
+
 ---
 
 ## 9. API contract (base `/api`)
@@ -333,7 +348,9 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11). Write `20
 | PUT | `/stores/{id}/products/{pid}` | `{to_show}` | `{success:true}` | tenant,shop_manager | star toggle |
 | GET | `/stores/{id}/employees` | — | `Employee[]` | tenant,mall_manager | |
 | GET | `/stores/{id}/offers` | — | `Offer[]` | permit | |
-| POST | `/stores/{id}/offers` | OfferCreate | `Offer 201` | tenant,mall_manager | **added** (no api.js entry; needed for Discount_Offer) |
+| POST | `/stores/{id}/offers` | OfferCreate | `Offer 201` | tenant,mall_manager | |
+| PUT | `/stores/{id}/offers/{oid}` | OfferCreate | `Offer` | tenant,mall_manager | full CRUD confirmed v2.1 |
+| DELETE | `/stores/{id}/offers/{oid}` | — | `204` | tenant,mall_manager | full CRUD confirmed v2.1 |
 | GET | `/products/{id}` | — | `Product` | permit | optional |
 | GET | `/bid-events` | `?mallId=&status=` | `BidEvent[]` | permit | |
 | GET | `/bid-events/{id}` | — | `BidEvent` | permit | |
@@ -347,8 +364,8 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11). Write `20
 | GET | `/tenants/{id}/stores` | — | `Store[]` | auth | |
 | GET | `/tenants/{id}/employees` | — | `Employee[]` | tenant,mall_manager | aggregate over tenant stores |
 | POST | `/tenants/{id}/employees` | EmployeeCreate | `Employee 201` | tenant | store must belong to tenant |
-| GET | `/tenants/{id}/revenue` | — | `Revenue[]` | tenant,exec | description only until migration |
-| POST | `/tenants/{id}/revenue` | `{description,month,amount}` | `Revenue 201` | tenant | month/amount accepted, ignored with warning header until migration (see §16) |
+| GET | `/tenants/{id}/revenue` | — | `Revenue[]` | tenant,exec | DEFERRED v2.1 — not in MVP build (pending P2) |
+| POST | `/tenants/{id}/revenue` | `{description,month,amount}` | `Revenue 201` | tenant | DEFERRED v2.1 — not in MVP build (pending P2) |
 | GET | `/tenants/{id}/transactions` | — | `Txn[]` | tenant | `sender = tenant.business_name` |
 | GET | `/employees/{id}` | — | `Employee` | self,manager,tenant | |
 | DELETE | `/employees/{id}` | — | `204` | tenant,mall_manager | **added** (`EmployeesView.jsx:34`) |
@@ -416,21 +433,21 @@ app:
 ## 13. Seeding (`V2__seed.sql`)
 
 Port `mockData.js` with **INT ids** (mapping documented in seed header, e.g. `m1→1, m2→2, m3→3; s1→1 … s10→10; p1→1 …; t1→1 …; e1→1 …; mm1→1 …; ex1→1; be1→1 …` preserving per-parent groupings for weak entities). Includes:
-- 3 malls (+ contact numbers, image_url, description), 10 stores (shop_number as `G-12` strings, listing_media as `|`-joined URLs), 18 products (+image_url), 22 store_products (`to_show` boolean), 4 tenants + 6 store_tenant joins, 9 employees (all with `mall_id`, `store_id` null for mall staff), 3 managers, 1 executive + 3 oversees rows, 3 bid events (`status` set, `final_allocation` true/false), 8 bids (+bidder_name), 6 transactions (+sender/receiver types), 6 revenue rows (description only — amount/month documented as seed-comment until migration), 4 offers, 5 leave, 7 payroll, 7 attendance, `User` rows for demo Google accounts (see below).
+- 3 malls (+ contact numbers, image_url, description), 10 stores (shop_number as `G-12` strings, listing_media as single URL = mock `listing_media[0]`), 18 products (+image_url), 22 store_products (`to_show` boolean), 4 tenants + 6 store_tenant joins, 9 employees (all with `mall_id`, `store_id` null for mall staff), 3 managers, 1 executive + 3 oversees rows, 3 bid events (`status` set, `final_allocation` true/false), 8 bids (+bidder_name), 6 transactions (+sender/receiver types), 4 offers, 5 leave, 7 payroll, 7 attendance, `User` rows for demo Google accounts (see below). Revenue seed DEFERRED with schema (pending P2).
 
-Demo Google accounts (pre-seeded emails; password none — sign in with Google using these emails):
-`customer.demo@gmail.com, tenant.demo@gmail.com (→ t1 Urban Threads), shopmgr.demo@gmail.com (→ e1 Marcus), mallmgr.demo@gmail.com (→ mm1 Daniel), exec.demo@gmail.com (→ ex1 Victoria), employee.demo@gmail.com (→ e2 Sarah)`. Exact emails TBD with user (placeholder domain).
+Demo placeholder logins (work in BOTH modes; in `demo` mode no Google token needed — POST email only):
+`customer.demo@gmail.com (customer), tenant.demo@gmail.com (→ t1 Urban Threads), shopmgr.demo@gmail.com (→ e1 Marcus), mallmgr.demo@gmail.com (→ mm1 Daniel), exec.demo@gmail.com (→ ex1 Victoria), employee.demo@gmail.com (→ e2 Sarah)`. Seeded in `V2__seed.sql` with matching `Tenant/Employee/Manager/Executive` emails so role derivation resolves without extra steps. In final Google mode the same addresses work once they are real Google accounts; no code change needed.
 
 ---
 
 ## 14. Frontend integration notes (read before coding phase)
 
 - **BREAK-INT:** backend returns INT ids (`1`) where frozen frontend expects strings (`'m1'`). Impact: `===`/`includes` joins (`tenant.store_ids.includes(store.store_id)`), hardcoded `'s1'` in `TenantDashboard.jsx:26`, fallback `'m1'` in `MallManagerDashboard.jsx:20`, route interpolation `/malls/${id}`. **No backend workaround per D-IDS** — integration phase MUST update frontend to treat ids as opaque numbers (or strings of numbers). Backend guarantees ids are stable and unique; nothing else.
-- **listing_media:** backend returns array (split on `|`) so `listing_media[0]` keeps working. Storage delimiter is internal; never expose raw string.
+- **listing_media:** backend returns a plain string (single URL). Frozen frontend does `listing_media[0]` (array) — change to direct string use at integration.
 - **Dates:** `YYYY-MM-DD`, datetimes ISO-8601, times `HH:mm` — matches current parsing, no change.
 - **Auth switch:** frontend `AuthContext` + `AuthPage` must be replaced with Google Identity Services button + `POST /api/auth/google`; `getAuthHeaders()` Bearer uses app JWT. Role strings stay lowercase (`shop_manager` inferred).
 - **Pagination:** frozen frontend calls without `?page=` get plain arrays — no break. New callers may opt into envelopes.
-- **Revenue:** `amount/month` will be `null` until migration — frontend `r.amount.toLocaleString()` will crash on null; therefore revenue UI must be treated as pending alongside backend migration (both deferred together).
+- **Revenue:** endpoints + UI both deferred together (pending P2). No `amount/month` in MVP.
 
 ---
 
@@ -439,13 +456,13 @@ Demo Google accounts (pre-seeded emails; password none — sign in with Google u
 > User asked to keep doubts here AND in this file.
 
 - **[D1-INT — DECIDED but breaking]:** "What do you mean frontend uses strings — does it modify ids?" It does not mutate ids; it uses them as join keys + equality + URLs. Type matters because `"1" !== 1` and `"/malls/m1" ≠ "/malls/1"`. With D-IDS=INT, integration WILL require frontend id handling changes. Confirm you accept that deferred break (or else we would need a string-alias adapter, which you rejected).
-- **[D2-MEDIA-DELIM — NEEDS CONFIRM]:** `|` delimiter chosen. Any objection, or do any real URLs in your data contain `|`? Alternative is JSON-array string in the column. Confirm `|` is safe.
+- **[D2-MEDIA — DECIDED v2.1]:** single URL string per store (listing image shown during bidding). No delimiter, no array. Frontend `[0]` indexing breaks at integration by design (one-line fix).
 - **[D3-FINAL — DECIDED with loss]:** Keeping `BOOLEAN` loses the allocation note string. Workaround derives display note from winning bid. Confirm acceptable for demo, and that no legal reliance will be placed on `final_allocation` until the `VARCHAR(500)` migration.
-- **[D4-REVENUE — DEFERRED]:** With schema frozen, `POST /tenants/{id}/revenue {month,amount}` cannot persist amount/month. Current design accepts-but-ignores with warning. Alternative is to disable the endpoint (`501`) until migration. Which do you prefer? (Default: accept-but-ignore.)
-- **[D5-EMP-DELETE-RULE — NEEDS CONFIRM]:** `Employee.mall_id` and `Mall_Manager.mall_id` use `ON DELETE RESTRICT`. Means a mall cannot be deleted while staff/managers reference it (must reassign first). Alternative `CASCADE` would auto-delete people (dangerous). Confirm RESTRICT.
+- **[D4-REVENUE — DECIDED v2.1]:** revenue endpoints + schema change fully deferred (pending P2). Not in MVP.
+- **[D5-DELETE-RULE — DECIDED v2.1]:** `RESTRICT` on `Employee.mall_id`, `Mall_Manager.mall_id`, `Store.mall_id`. Mall cannot be deleted while referenced.
 - **[D6-BID-ID — MITIGATED]:** App-level `bid_id` uniqueness via service sequence + future `UNIQUE(bid_id)` index. Confirm no external system inserts bids bypassing the API (which would break the sequence).
 - **[D7-GOOGLE-ROLE — NEEDS CONFIRM]:** First Google login auto-creates `customer` User. Tenant/employee/manager/executive access requires their email to PRE-EXIST in the respective table (seeded or created by an authorized role). So onboarding flow is: admin creates tenant/employee/manager row with the person's Gmail → person clicks Google login → gets correct role. Confirm this flow matches your ops. Also confirm the 6 placeholder demo Gmail addresses in §13.
-- **[D8-OFFERS-API — NEEDS CONFIRM]:** `Discount_Offer` has no `api.js` entry and no observed page usage. Designed minimal `GET/POST /stores/{id}/offers` + `GET /malls/{id}/offers`. Do you need PUT/DELETE or mall-wide list for any dashboard? If unused, we can ship entity+read-only and add writes later.
+- **[D8-OFFERS — DECIDED v2.1]:** full CRUD on `/stores/{id}/offers` (GET/POST/PUT/DELETE) + `GET /malls/{id}/offers`.
 - **[D9-SHOP_NUMBER — DECIDED]:** Changed to `VARCHAR(20)` (not an ID). Confirm no numeric sorting/arithmetic depends on it being INT.
 - **[D10-EXEC-SEED — NEEDS EMAIL LIST]:** No executive creation endpoint. Provide the real Gmail(s) for the seeded executive(s), or confirm placeholders are fine for now.
 
@@ -456,21 +473,23 @@ Demo Google accounts (pre-seeded emails; password none — sign in with Google u
 | ID | Item | Trigger to implement |
 |---|---|---|
 | P1 | Analytics endpoint + service | New requirement + `Financial_Transaction.receiver_mall_id` normalization decision |
-| P2 | `Revenue_Information ADD (month VARCHAR(50), amount DECIMAL(10,2), submitted_date DATE)` + backfill + DTO non-null | User approval to ALTER |
+| P2 | Revenue endpoints + `Revenue_Information ADD (month, amount, submitted_date)` + seed | Deferred per v2.1 answer — not in MVP |
 | P3 | `Bid_Event.final_allocation BOOLEAN → VARCHAR(500)` (+ keep `status`) | User approval; blocks legal allocation notes |
 | P4 | `Bid ADD UNIQUE(bid_id)` → eventual surrogate PK | After P3, low priority |
 | P5 | `Financial_Transaction.receiver_mall_id FK` normalization | If analytics revived |
-| P6 | Frontend migration (INT ids, Google button, paged lists, revenue null-guard) | Separate frontend phase (currently forbidden) |
+| P6 | Frontend migration (INT ids, Google button, paged lists, listing_media string, revenue) | Separate frontend phase (currently forbidden) |
 | P7 | Prod CORS origins, `GOOGLE_CLIENT_ID`, `APP_JWT_SECRET` rotation, HTTPS | Deploy phase |
 
 ---
 
 ## 17. Implementation phases (after this design is approved)
 
-1. **Scaffold:** `pom.xml`, `application.yml`, `V1__deltas.sql` (§6), `GlobalExceptionHandler`, `SecurityConfig` (Google+JWT stub), `GET /api/health` → verify boot + Flyway validate.
+**2-day demo slice first (profile `demo`, auth disabled):** scaffold + health → malls/stores/products + seed → tenants/employees/managers/executives + stub auth → bid events/bids (read + place + finalize) + offers/transactions read. Skip: Google verifier wiring (stub only), revenue (deferred), analytics, strict role tests. Demo run: `SPRING_PROFILES_ACTIVE=demo mvn spring-boot:run`, login with any §13 placeholder email.
+
+1. **Scaffold:** `pom.xml`, `application.yml`, `V1__deltas.sql` (§6), `GlobalExceptionHandler`, `SecurityConfig` (demo-permit + real guard behind `!demo`), `GET /api/health` → verify boot + Flyway validate.
 2. **Core:** `Mall/Store/Product/StoreProduct` entities+repos+services+controllers + `V2__seed.sql` (malls/stores/products) → `curl` paged + unpaged lists.
 3. **People:** `Tenant/Employee/Manager/Executive/Oversees/User` + Google exchange + role derivation → verify each demo Gmail gets correct role.
-4. **Transactions:** `Bid/BidEvent` (locking test), `Attendance/Leave/Payroll`, `Offers`, `Transactions/Revenue` (with documented loss) → concurrency + validation tests.
+4. **Transactions:** `Bid/BidEvent` (locking test), `Attendance/Leave/Payroll`, `Offers` (full CRUD), `Transactions` → concurrency + validation tests. Revenue excluded (pending P2).
 5. **Parity check:** script comparing `mockData.js` (mapped through INT translation table) vs `GET /api/*` responses; OpenAPI published.
 
 **Success criteria:** boot clean, Flyway `validate` passes against unmodified `mall_schema.sql` + `V1` deltas, all §9 endpoints return `snake_case` JSON matching DTOs, `POST /bid-events/{id}/bids` rejects low bids under concurrent load, Google exchange returns correct role for each seeded email, paged + unpaged list shapes both verified.
@@ -485,11 +504,11 @@ Demo Google accounts (pre-seeded emails; password none — sign in with Google u
 - `AppTokenProvider.issue(email, role, profileId, profileType): String` ; `parse(token): AppClaims`.
 - `BidService.placeBid(eventId, PlaceBidRequest): BidResponse` — `@Transactional`, `bidEventRepo.findByIdForUpdate(eventId)`, validate, flip, insert.
 - `BidEventService.finalize(eventId, FinalizeRequest): BidEventResponse`.
-- `StoreService.toStoreResponse(Store): StoreResponse` — splits `listing_media` on `|`.
+- `StoreService.toStoreResponse(Store): StoreResponse` — direct single-URL mapping, no split.
 - `TenantService.create(TenantCreateRequest): TenantResponse` — creates tenant + joins + flips store statuses.
 - `AttendanceService.checkIn(empId)/checkOut(empId): AttendanceResponse`.
 - `GlobalExceptionHandler`: `ResourceNotFound→404, BadRequest→400, Conflict→409, Validation→422, AccessDenied→403, GoogleVerify→401`.
 
 ---
 
-*End of DESIGN v2.0 — awaiting approval on §15 D2/D4/D5/D7/D8/D10 before scaffolding.*
+*End of DESIGN v2.1 — decisions D2/D4/D5/D8/store-mall locked. Remaining: D6 (no bypass inserts?), D7 (onboarding flow + 6 demo Gmails), D10 (real executive Gmail(s)), plus GOOGLE_CLIENT_ID + prod CORS at build time.*

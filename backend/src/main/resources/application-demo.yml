@@ -1,0 +1,4 @@
+# Demo profile: login disabled, no GCP setup needed.
+app:
+  auth:
+    enabled: false
