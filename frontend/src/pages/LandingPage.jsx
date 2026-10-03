@@ -30,11 +30,15 @@ export default function LandingPage() {
   const [bidEvent, setBidEvent] = useState(null);
   const { navigate } = useRouter();
   const { user } = useAuth();
+  const [userLatitue, setUserLatitude] = useState();
+  const [userLongitude, setUserLongitude] = useState();
 
   const handleSelectMall = (mall) => {
     setSelectedMall(mall);
     setView('mall-detail');
   };
+
+  
 
   const filteredMalls = malls.filter(m =>
     !searchQuery ||
@@ -55,7 +59,8 @@ export default function LandingPage() {
     setView('properties');
   };
 
-   const handleSearchRequest = () => {
+   const handleSearchRequest = (query) => {
+    filteredMalls.filter(m => m.city = query)
     alert("SEARCH FOR A MALL");
     };
 
@@ -70,6 +75,27 @@ export default function LandingPage() {
       setView('property-detail');
     }
   };
+
+  const geoFindMe = ()=> {
+
+
+  function success(position) {
+    const latitude = position.coords.latitude;
+    const longitude = position.coords.longitude;
+    setUserLatitude(latitude);
+    setUserLongitude(longitude);
+  }
+
+  function error() {
+    alert("Unable to retrieve your location");
+  }
+
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported in your browser");
+  } else {
+    navigator.geolocation.getCurrentPosition(success, error);
+  }
+}
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -119,9 +145,15 @@ export default function LandingPage() {
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm"
                   />
                 </div>
-                <button onClick={handleSearchRequest} className="btn bg-white text-brand-700 hover:bg-brand-50 px-5 py-2.5 rounded-lg font-semibold text-sm">
+                <button onClick={() =>{handleSearchRequest(searchQuery);geoFindMe()}} className="btn bg-white text-brand-700 hover:bg-brand-50 px-5 py-2.5 rounded-lg font-semibold text-sm">
                   Search
                 </button>
+                 <button onClick={() =>{geoFindMe()}} className="btn bg-white text-brand-700 hover:bg-brand-50 px-5 py-2.5 rounded-lg font-semibold text-sm">
+                  Find nearby malls
+                </button>
+                <div className='text-white'> {(userLatitue?userLatitue:"Find latitude")} {(userLongitude?userLongitude:"")}</div>
+                
+
               </div>
             </div>
           </section>
