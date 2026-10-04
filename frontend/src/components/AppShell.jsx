@@ -150,7 +150,7 @@ export default function AppShell({ children }) {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-sm font-semibold">
-              {user.firstName[0]}{user.lastName[0]}
+              {user.firstName?.[0] || ''}{user.lastName?.[0] || ''}
             </div>
           </div>
         </header>

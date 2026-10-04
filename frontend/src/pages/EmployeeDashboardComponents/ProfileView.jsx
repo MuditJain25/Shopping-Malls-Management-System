@@ -26,7 +26,7 @@ export default function ProfileView({ empId, user }) {
         <div className="card p-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-lg bg-brand-100 flex items-center justify-center text-brand-700 font-bold">
-              {user.firstName[0]}{user.lastName[0]}
+              {user.firstName?.[0] || ''}{user.lastName?.[0] || ''}
             </div>
             <div>
               <h3 className="font-semibold text-slate-900">{user.firstName} {user.lastName}</h3>

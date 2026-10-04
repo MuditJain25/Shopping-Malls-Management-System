@@ -25,9 +25,23 @@ export function AuthProvider({ children }) {
     return loggedIn;
   }, []);
 
+  // The API serialises every response as snake_case, so normalise the auth user once
+  // here instead of making each consumer read two spellings.
+  const toUser = useCallback(
+    (data) => ({
+      id: data.id,
+      email: data.email,
+      role: data.role,
+      firstName: data.firstName ?? data.first_name ?? '',
+      lastName: data.lastName ?? data.last_name ?? '',
+      profileId: data.profileId ?? data.profile_id ?? null,
+    }),
+    [],
+  );
+
   const loginWithGoogle = useCallback(
-    (credential) => apiGoogleLogin(credential).then(persist),
-    [persist],
+    (credential) => apiGoogleLogin(credential).then(toUser).then(persist),
+    [persist, toUser],
   );
 
   const logout = useCallback(async () => {
