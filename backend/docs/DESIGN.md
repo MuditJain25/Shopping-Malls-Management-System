@@ -25,7 +25,7 @@
 | D-FINAL | `Bid_Event.final_allocation BOOLEAN` kept as-is for now (committed schema). Workaround in §6-D10. |
 | D-BIDPK | `Bid` composite PK `(user_id, bid_id)` + composite FK `(store_id, event_id)` kept as-is (committed). Workarounds in §6-D11. |
 | D-PROD-IMG | Add `Product.image_url`. |
-| D-PAGING | All list endpoints support pagination (`page/size/sort`). Backward-compat: unpaged array by default (see §11). |
+| D-PAGING | Removed on this branch — list endpoints return plain arrays. `master` retains the paginated version. |
 | D-ANALYTICS | No analytics endpoint for MVP. Deferred. |
 | D-MEDIA | Image/media are external URLs only (Pexels). No upload endpoint. |
 | D-DISCOUNT | `Discount_Offer` entity needed (full CRUD: GET/POST/PUT/DELETE, confirmed v2.1). |
@@ -141,7 +141,6 @@ backend/
         TransactionResponse.java     // transaction_id, amount, sender, receiver, sender_type, receiver_type, transaction_date, remarks
         LeaveResponse.java / PayrollResponse.java / AttendanceResponse.java / OfferResponse.java
         ApiError.java                // { timestamp, status, error, message, path }
-        PageEnvelope.java            // { content, page, size, total_elements, total_pages, last } — only when ?page= present
     entity/  (table → class, all IDs INT, see §5)
       Mall, MallContactNumber, MallManager, EnterpriseExecutive, ExecutiveOverseesMall,
       Store, Product, StoreProduct (+ StoreProductId @Embeddable),
@@ -326,7 +325,7 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
 
 ## 9. API contract (base `/api`)
 
-Pagination: every `GET` list supports `?page=&size=&sort=` (see §11). Write `201` returns created body; `DELETE` returns `204`.
+All list endpoints return plain JSON arrays, ordered in SQL (see §11). Write `201` returns created body; `DELETE` returns `204`.
 
 | Method | Path | Req body | Resp | Roles | Notes / mock source |
 |---|---|---|---|---|---|
@@ -400,12 +399,21 @@ Error shape (all failures): `{ timestamp, status, error, message, path }`. Valid
 
 ---
 
-## 11. Pagination / filtering / sorting
+## 11. Filtering / ordering (no pagination on this branch)
 
-- Query: `?page=0&size=20&sort=city,asc` (`size` max 100). `sort` = `<field>,<asc|desc>`, repeatable.
-- **Backward-compat rule (because frontend is frozen and expects arrays):** if `page` absent → return JSON array (unpaged, capped at 500 + `Warning` header if truncated). If `page` present → return `PageEnvelope { content, page, size, total_elements, total_pages, last }`.
-- Applies to: `/malls`, `/stores/**`, `/tenants`, `/employees/**`, `/bid-events`, `/bid-events/{id}/bids`, `/managers`, `/transactions`, `/revenue`, `/offers`.
-- Filtering: `q` (malls search), `status` (stores/bids), `mallId`, `storeId`, `from/to` (attendance dates). All optional.
+- Every list endpoint returns a plain JSON array. No `page`/`size`/`sort` params, no envelope.
+- Ordering is applied in SQL: derived queries encode it in the method name
+  (`findByMallId`, `findByStatusOrderByTransactionIdAsc`, ...); `@Query` methods take a
+  `Sort` argument. This keeps row order deterministic without an envelope.
+- Filtering is also in SQL, never in Java — see §6 and the repository `@Query` methods:
+  `MallRepository.search` (q/city), `BidEventRepository.findByMallAndStatus`,
+  `TenantRepository.findByMall`, `EmployeeRepository.findByMallIdAndStoreId`,
+  `EmployeeRepository.findByTenant`, `OfferRepository.findByMall`, `StoreRepository.findByTenant`.
+- Optional filters: `q` (malls search over city/state/description), `city`, `status`
+  (stores/bids), `mallId`, `storeId`, `from`/`to` (attendance dates).
+- **Pagination was removed only on the `no-pagination` branch** (demo). The `master`
+  branch still has it — see §16-P8. No endpoint contract changes between the two:
+  both return arrays to a client that sends no paging params.
 
 ---
 
@@ -446,7 +454,7 @@ Demo placeholder logins (work in BOTH modes; in `demo` mode no Google token need
 - **listing_media:** backend returns a plain string (single URL). Frozen frontend does `listing_media[0]` (array) — change to direct string use at integration.
 - **Dates:** `YYYY-MM-DD`, datetimes ISO-8601, times `HH:mm` — matches current parsing, no change.
 - **Auth switch:** frontend `AuthContext` + `AuthPage` must be replaced with Google Identity Services button + `POST /api/auth/google`; `getAuthHeaders()` Bearer uses app JWT. Role strings stay lowercase (`shop_manager` inferred).
-- **Pagination:** frozen frontend calls without `?page=` get plain arrays — no break. New callers may opt into envelopes.
+- **Lists:** every list endpoint returns a plain array ordered in SQL — exactly what the frozen frontend expects, no envelope to unwrap.
 - **Revenue:** endpoints + UI both deferred together (pending P2). No `amount/month` in MVP.
 
 ---

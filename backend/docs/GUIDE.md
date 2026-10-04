@@ -45,7 +45,7 @@ Anything else = Google ID-token verification + app JWT required.
 | 10 | `resources/db/migration/V2__seed.sql` | Demo data and the `m1→1, s1→1…` ID map |
 
 Full inventory: **20 entities, 20 repositories, 9 services, 11 controllers,
-4 DTO files + 2 paging helpers, 3 security classes, 2 config classes,
+4 DTO files, 3 security classes, 2 config classes,
 1 exception class + 1 handler, 1 smoke test.**
 
 ---
@@ -152,7 +152,7 @@ Second call: row exists with check-in set → 409 "Already checked in today"
 
 ---
 
-## 8. Config, DTOs, paging, tests
+## 8. Config, DTOs, how lists are built, tests
 
 - `resources/application.yml` — datasource, `ddl-auto: validate` (Hibernate never alters
   the schema; Flyway owns it), Jackson `SNAKE_CASE`, JWT/CORS settings.
@@ -160,8 +160,12 @@ Second call: row exists with check-in set → 409 "Already checked in today"
 - DTOs are Java `record`s grouped by domain (`AuthDtos`, `MallDtos`, `BidDtos`,
   `PeopleDtos`) — immutable, no boilerplate. Requests carry `jakarta.validation`
   annotations (`@NotBlank`, `@Email`, `@Min`, `@NotNull`).
-- Paging is optional by design: no `?page=` → plain JSON array (what the frozen frontend
-  expects); with `?page=&size=&sort=` → `PageEnvelope` (`dto/Paging.java`, `dto/PageEnvelope.java`).
+- **List endpoints return a plain array — no pagination on this branch.** Ordering comes
+  from SQL: derived queries encode it in the method name (`findByStatusOrderByTransactionIdAsc`),
+  and `@Query` methods take a `Sort` argument. Filtering is SQL too (`MallRepository.search`,
+  `findByMallAndStatus`, `findByMall`, `findByTenant`, …) — never a Java `.filter()` over
+  loaded rows. Two `toResponses(List<…>)` helpers in `MallService`, `TenantService` and
+  `BidService` batch-load child rows so a page/list costs a fixed number of queries.
 - `MallHubSmokeTest.java` — boots the app in `demo` profile, asserts `/api/health`
   is UP and `/api/malls` returns 3 rows. Run: `mvn test`.
 
