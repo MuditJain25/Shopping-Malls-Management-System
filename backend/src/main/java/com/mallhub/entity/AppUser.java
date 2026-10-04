@@ -5,10 +5,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-// Reuses the committed User table; only addition is google_sub (see V1 migration).
+// Reuses the committed User table; only addition is google_sub.
 // Role is derived per login from the domain tables, never stored.
 @Entity
-@Table(name = "`User`")
+@Table(name = "`User`") // Not "User" because that's reserved internally in MySQL for database users
 @Getter
 @Setter
 @NoArgsConstructor
