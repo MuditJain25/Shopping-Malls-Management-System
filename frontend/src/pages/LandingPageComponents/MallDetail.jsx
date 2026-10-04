@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { ChevronRight, MapPin, Building2 } from "lucide-react";
 // import { getAvailableStores } from '../../lib/api';
 import { Badge, ErrorState, EmptyState } from "@/components/ui/index.jsx";
@@ -77,13 +77,7 @@ export default function MallDetail({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 to-transparent" />
         <div className="absolute bottom-4 left-4 text-white">
-          <h1 className="font-bold text-2xl mb-1">
-            {mall.city === "New York"
-              ? "Heritage Plaza"
-              : mall.city === "San Jose"
-                ? "Tech Park Mall"
-                : "Lakeshore Mall"}
-          </h1>
+          <h1 className="font-bold text-2xl mb-1">{mall.mall_name}</h1>
           <div className="flex items-center gap-3 text-sm text-slate-200">
             <span className="flex items-center gap-1">
               <MapPin size={12} /> {mall.street}, {mall.city}, {mall.state}
@@ -140,7 +134,7 @@ export default function MallDetail({
                   {store.store_name}
                 </p>
                 <p className="text-xs text-slate-400">
-                  Floor {store.floor} · Shop {store.shop_number}
+                  Floor {store.floor} ┬╖ Shop {store.shop_number}
                 </p>
               </div>
             </div>
