@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiLogin, apiSignup, apiLogout } from '@/lib/api.js';
+import { apiGoogleLogin, apiEmailLogin, apiLogout } from '@/lib/api.js';
 
 const AuthContext = createContext(null);
 
@@ -19,19 +19,21 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const loggedIn = await apiLogin(email, password);
+  const persist = useCallback((loggedIn) => {
     setUser(loggedIn);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(loggedIn));
     return loggedIn;
   }, []);
 
-  const signup = useCallback(async (data) => {
-    const newUser = await apiSignup(data);
-    setUser(newUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-    return newUser;
-  }, []);
+  const loginWithGoogle = useCallback(
+    (credential) => apiGoogleLogin(credential).then(persist),
+    [persist],
+  );
+
+  const loginWithEmail = useCallback(
+    (email) => apiEmailLogin(email).then(persist),
+    [persist],
+  );
 
   const logout = useCallback(async () => {
     await apiLogout();
@@ -40,7 +42,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );

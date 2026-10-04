@@ -55,61 +55,51 @@
 
 import * as mock from './mockData.js';
 
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
-// function getAuthHeaders() {
-//   const token = localStorage.getItem('auth_token');
-//   return {
-//     'Content-Type': 'application/json',
-//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//   };
-// }
-
-// async function apiFetch(path, options = {}) {
-//   const response = await fetch(`${API_BASE_URL}${path}`, {
-//     ...options,
-//     headers: { ...getAuthHeaders(), ...options.headers },
-//   });
-//   if (!response.ok) {
-//     const error = await response.json().catch(() => ({ message: 'Request failed' }));
-//     throw new Error(error.message || `HTTP ${response.status}`);
-//   }
-//   return response.json();
-// }
-
-// ── Auth ────────────────────────────────────────────────────────
-export async function apiLogin(email, password) {
-  // return apiFetch('/auth/login', {
-  //   method: 'POST',
-  //   body: JSON.stringify({ email, password }),
-  // });
-
-  // MOCK: check against demo users
-  const user = mock.demoUsers.find(u => u.email === email && u.password === password);
-  if (!user) throw new Error('Invalid email or password');
-  const { password: _pw, ...userWithoutPw } = user;
-  return userWithoutPw;
-}
-
-export async function apiSignup({ firstName, lastName, email, password, role }) {
-  // return apiFetch('/auth/signup', {
-  //   method: 'POST',
-  //   body: JSON.stringify({ firstName, lastName, email, password, role }),
-  // });
-
-  // MOCK: create a new user object
+function getAuthHeaders() {
+  const token = localStorage.getItem('auth_token');
   return {
-    id: `u${Date.now()}`,
-    email,
-    role,
-    firstName,
-    lastName,
-    profileId: `u${Date.now()}`,
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: { ...getAuthHeaders(), ...options.headers },
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+// ── Auth ────────────────────────────────────────────────────────
+// The Google ID token is verified server-side; we keep only our own JWT, which
+// carries role + profileId, so no later request re-verifies anything with Google.
+async function exchange(credentials) {
+  const data = await apiFetch('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+  localStorage.setItem('auth_token', data.token);
+  return data.user;
+}
+
+export async function apiGoogleLogin(idToken) {
+  return exchange({ id_token: idToken });
+}
+
+// Only works while the backend runs the `demo` profile, which skips verification.
+export async function apiEmailLogin(email) {
+  return exchange({ email });
+}
+
 export async function apiLogout() {
-  // return apiFetch('/auth/logout', { method: 'POST' });
+  localStorage.removeItem('auth_token');
   return { success: true };
 }
 

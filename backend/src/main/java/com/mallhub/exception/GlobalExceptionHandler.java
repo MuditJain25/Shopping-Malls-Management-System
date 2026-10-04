@@ -1,6 +1,7 @@
 package com.mallhub.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,6 +29,12 @@ public class GlobalExceptionHandler {
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         return body(HttpStatus.UNPROCESSABLE_ENTITY, fields, req.getRequestURI());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadable(HttpMessageNotReadableException ex,
+                                                                 HttpServletRequest req) {
+        return body(HttpStatus.BAD_REQUEST, "Malformed request body", req.getRequestURI());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

@@ -119,7 +119,6 @@ export default function LandingPage() {
             ) : (
               <>
                 <button onClick={() => navigate('/signin')} className="btn-primary text-sm">Sign In</button>
-                <button onClick={() => navigate('/signup')} className="btn-primary text-sm">Sign Up</button>
               </>
             )}
           </div>

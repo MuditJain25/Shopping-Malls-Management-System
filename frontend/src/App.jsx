@@ -27,12 +27,12 @@ function AppContent() {
 
   // Public routes
   if (route === '/' || route === '') return <LandingPage />;
-  if (route === '/signin') return <AuthPage mode="signin" />;
-  if (route === '/signup') return <AuthPage mode="signup" />;
+  // Accounts are created on first Google sign-in, so signup and signin are the same page.
+  if (route === '/signin' || route === '/signup') return <AuthPage />;
 
   // Protected app routes — require auth
   if (route.startsWith('/app/')) {
-    if (!user) return <AuthPage mode="signin" />;
+    if (!user) return <AuthPage />;
 
     const role = user.role;
     const dashboard = ROLE_DASHBOARDS[role];
