@@ -1,8 +1,7 @@
 package com.mallhub.repository;
 
 import com.mallhub.entity.Mall;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,7 +18,7 @@ public interface MallRepository extends JpaRepository<Mall, Integer> {
                    OR LOWER(m.state) LIKE CONCAT('%', LOWER(:q), '%')
                    OR LOWER(m.description) LIKE CONCAT('%', LOWER(:q), '%'))
             """)
-    Page<Mall> search(@Param("q") String q, @Param("city") String city, Pageable pageable);
+    List<Mall> search(@Param("q") String q, @Param("city") String city, Sort sort);
 
     @Query("""
             SELECT m FROM Mall m

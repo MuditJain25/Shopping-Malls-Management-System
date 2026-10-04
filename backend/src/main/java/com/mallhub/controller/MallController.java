@@ -1,6 +1,5 @@
 package com.mallhub.controller;
 
-import com.mallhub.dto.Paging;
 import com.mallhub.service.BidService;
 import com.mallhub.service.MallService;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +17,8 @@ public class MallController {
 
     @GetMapping
     public Object list(@RequestParam(required = false) String q,
-                       @RequestParam(required = false) String city,
-                       @RequestParam(required = false) Integer page,
-                       @RequestParam(required = false) Integer size) {
-        return Paging.shape(malls.list(q, city, Paging.pageable(page, size, "mallId")), page);
+                       @RequestParam(required = false) String city) {
+        return malls.list(q, city);
     }
 
     @GetMapping("/{id}")
@@ -30,10 +27,8 @@ public class MallController {
     }
 
     @GetMapping("/{id}/stores")
-    public Object stores(@PathVariable Integer id,
-                         @RequestParam(required = false) Integer page,
-                         @RequestParam(required = false) Integer size) {
-        return Paging.shape(malls.storesByMall(id, Paging.pageable(page, size, "storeId")), page);
+    public Object stores(@PathVariable Integer id) {
+        return malls.storesByMall(id);
     }
 
     @GetMapping("/{id}/products/top")
@@ -48,26 +43,18 @@ public class MallController {
 
     @GetMapping("/{id}/employees")
     public Object employees(@PathVariable Integer id,
-                            @RequestParam(required = false) Integer storeId,
-                            @RequestParam(required = false) Integer page,
-                            @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "employeeId");
-        return Paging.shape(malls.employeesByMall(id, storeId, p), page);
+                            @RequestParam(required = false) Integer storeId) {
+        return malls.employeesByMall(id, storeId);
     }
 
     @GetMapping("/{id}/bid-events")
     public Object bidEvents(@PathVariable Integer id,
-                            @RequestParam(required = false) String status,
-                            @RequestParam(required = false) Integer page,
-                            @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "id.eventId");
-        return Paging.shape(bids.list(id, status, p), page);
+                            @RequestParam(required = false) String status) {
+        return bids.list(id, status);
     }
 
     @GetMapping("/{id}/offers")
-    public Object offers(@PathVariable Integer id,
-                         @RequestParam(required = false) Integer page,
-                         @RequestParam(required = false) Integer size) {
-        return Paging.shape(malls.offersByMall(id, Paging.pageable(page, size, "id.offerId")), page);
+    public Object offers(@PathVariable Integer id) {
+        return malls.offersByMall(id);
     }
 }

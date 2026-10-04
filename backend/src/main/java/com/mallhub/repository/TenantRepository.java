@@ -1,12 +1,12 @@
 package com.mallhub.repository;
 
 import com.mallhub.entity.Tenant;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface TenantRepository extends JpaRepository<Tenant, Integer> {
@@ -18,5 +18,5 @@ public interface TenantRepository extends JpaRepository<Tenant, Integer> {
             JOIN Store s ON s.storeId = st.id.storeId
             WHERE s.mallId = :mallId
             """)
-    Page<Tenant> findByMall(@Param("mallId") Integer mallId, Pageable pageable);
+    List<Tenant> findByMall(@Param("mallId") Integer mallId, Sort sort);
 }

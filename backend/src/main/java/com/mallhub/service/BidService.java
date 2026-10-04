@@ -6,9 +6,7 @@ import com.mallhub.entity.BidEvent;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.BidEventRepository;
 import com.mallhub.repository.BidRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +18,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class BidService {
+    private static final Sort BY_EVENT = Sort.by("id.eventId");
+
     private final BidEventRepository events;
     private final BidRepository bids;
 
@@ -28,22 +28,20 @@ public class BidService {
         this.bids = bids;
     }
 
-    public Page<BidDtos.BidEventResponse> list(Integer mallId, String status, Pageable pageable) {
-        Page<BidEvent> page = mallId == null
-                ? events.findByStatus(status, pageable)
-                : events.findByMallAndStatus(mallId, status, pageable);
-        return new PageImpl<>(toResponses(page.getContent()), page.getPageable(),
-                page.getTotalElements());
+    public List<BidDtos.BidEventResponse> list(Integer mallId, String status) {
+        return toResponses(mallId == null
+                ? events.findByStatus(status, BY_EVENT)
+                : events.findByMallAndStatus(mallId, status, BY_EVENT));
     }
 
     public BidDtos.BidEventResponse get(Integer eventId) {
         return toResponse(requireByEventId(eventId));
     }
 
-    public Page<BidDtos.BidResponse> bidsByEvent(Integer eventId, Pageable pageable) {
-        BidEvent e = requireByEventId(eventId);
-        return bids.findByEventIdAndStoreIdOrderByRoundNumberAsc(
-                e.getId().getEventId(), e.getId().getStoreId(), pageable).map(BidService::toResponse);
+    public List<BidDtos.BidResponse> bidsByEvent(Integer eventId) {
+        BidEvent.Id key = requireByEventId(eventId).getId();
+        return bids.findByEventIdAndStoreIdOrderByRoundNumberAsc(key.getEventId(), key.getStoreId())
+                .stream().map(BidService::toResponse).toList();
     }
 
     // Single global lookup: seed assigns unique event_ids, so exactly one row matches.
@@ -110,12 +108,12 @@ public class BidService {
         return toResponse(e, winning);
     }
 
-    /** One winning-bid query for the whole page instead of one per event. */
+    /** One winning-bid query for the whole list instead of one per event. */
     List<BidDtos.BidEventResponse> toResponses(List<BidEvent> batch) {
         if (batch.isEmpty()) return List.of();
         Map<Integer, BidDtos.BidResponse> winners = bids.findByStatusAndEventIdIn("winning",
                         batch.stream().map(e -> e.getId().getEventId()).toList()).stream()
-                .collect(Collectors.toMap(b -> b.getEventId(), BidService::toResponse));
+                .collect(Collectors.toMap(Bid::getEventId, BidService::toResponse));
         return batch.stream()
                 .map(e -> toResponse(e, winners.get(e.getId().getEventId())))
                 .toList();

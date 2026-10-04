@@ -1,7 +1,6 @@
 package com.mallhub.controller;
 
 import com.mallhub.dto.MallDtos;
-import com.mallhub.dto.Paging;
 import com.mallhub.service.StoreService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -19,10 +18,8 @@ public class StoreController {
     }
 
     @GetMapping("/available")
-    public Object available(@RequestParam(required = false) Integer mallId,
-                            @RequestParam(required = false) Integer page,
-                            @RequestParam(required = false) Integer size) {
-        return Paging.shape(stores.available(mallId, Paging.pageable(page, size, "storeId")), page);
+    public Object available(@RequestParam(required = false) Integer mallId) {
+        return stores.available(mallId);
     }
 
     @GetMapping("/{id}")
@@ -31,11 +28,8 @@ public class StoreController {
     }
 
     @GetMapping("/{id}/products")
-    public Object products(@PathVariable Integer id,
-                           @RequestParam(required = false) Integer page,
-                           @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "id.productId");
-        return Paging.shape(stores.productsByStore(id, p), page);
+    public Object products(@PathVariable Integer id) {
+        return stores.productsByStore(id);
     }
 
     @PostMapping("/{id}/products")
@@ -53,18 +47,13 @@ public class StoreController {
     }
 
     @GetMapping("/{id}/employees")
-    public Object employees(@PathVariable Integer id,
-                            @RequestParam(required = false) Integer page,
-                            @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "employeeId");
-        return Paging.shape(stores.employeesByStore(id, p), page);
+    public Object employees(@PathVariable Integer id) {
+        return stores.employeesByStore(id);
     }
 
     @GetMapping("/{id}/offers")
-    public Object offers(@PathVariable Integer id,
-                         @RequestParam(required = false) Integer page,
-                         @RequestParam(required = false) Integer size) {
-        return Paging.shape(stores.offersByStore(id, Paging.pageable(page, size, "id.offerId")), page);
+    public Object offers(@PathVariable Integer id) {
+        return stores.offersByStore(id);
     }
 
     @PostMapping("/{id}/offers")

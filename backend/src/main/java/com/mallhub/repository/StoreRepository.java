@@ -1,8 +1,7 @@
 package com.mallhub.repository;
 
 import com.mallhub.entity.Store;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,11 +10,11 @@ import java.util.List;
 
 public interface StoreRepository extends JpaRepository<Store, Integer> {
 
-    Page<Store> findByMallId(Integer mallId, Pageable pageable);
+    List<Store> findByMallId(Integer mallId, Sort sort);
 
-    Page<Store> findByMallIdAndStatus(Integer mallId, String status, Pageable pageable);
+    List<Store> findByMallIdAndStatus(Integer mallId, String status, Sort sort);
 
-    Page<Store> findByStatus(String status, Pageable pageable);
+    List<Store> findByStatus(String status, Sort sort);
 
     @Query("""
             SELECT s FROM Store s

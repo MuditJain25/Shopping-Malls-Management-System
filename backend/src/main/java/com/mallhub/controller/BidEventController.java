@@ -1,7 +1,6 @@
 package com.mallhub.controller;
 
 import com.mallhub.dto.BidDtos;
-import com.mallhub.dto.Paging;
 import com.mallhub.service.BidService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -18,11 +17,8 @@ public class BidEventController {
 
     @GetMapping
     public Object list(@RequestParam(required = false) Integer mallId,
-                       @RequestParam(required = false) String status,
-                       @RequestParam(required = false) Integer page,
-                       @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "id.eventId");
-        return Paging.shape(bids.list(mallId, status, p), page);
+                       @RequestParam(required = false) String status) {
+        return bids.list(mallId, status);
     }
 
     @GetMapping("/{id}")
@@ -31,11 +27,8 @@ public class BidEventController {
     }
 
     @GetMapping("/{id}/bids")
-    public Object bids(@PathVariable Integer id,
-                       @RequestParam(required = false) Integer page,
-                       @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "roundNumber");
-        return Paging.shape(bids.bidsByEvent(id, p), page);
+    public Object bids(@PathVariable Integer id) {
+        return bids.bidsByEvent(id);
     }
 
     @PostMapping("/{id}/bids")

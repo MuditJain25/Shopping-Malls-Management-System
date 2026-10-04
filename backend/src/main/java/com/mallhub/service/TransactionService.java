@@ -5,9 +5,9 @@ import com.mallhub.entity.Mall;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.MallRepository;
 import com.mallhub.repository.TransactionRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class TransactionService {
@@ -19,14 +19,15 @@ public class TransactionService {
         this.malls = malls;
     }
 
-    public Page<PeopleDtos.TransactionResponse> list(Integer mallId, Pageable pageable) {
+    public List<PeopleDtos.TransactionResponse> list(Integer mallId) {
         if (mallId == null) {
-            return transactions.findAll(pageable).map(TenantService::toResponse);
+            return transactions.findAll().stream().map(TenantService::toResponse).toList();
         }
         Mall mall = malls.findById(mallId).orElseThrow(() -> ApiException.notFound("Mall"));
         // Receiver names are denormalized strings; the mapping lives in one place.
         // TODO: normalize to receiver_mall_id FK if analytics is revived (pending P5).
-        return transactions.findByReceiver(receiverFor(mall), pageable).map(TenantService::toResponse);
+        return transactions.findByReceiverOrderByTransactionIdAsc(receiverFor(mall)).stream()
+                .map(TenantService::toResponse).toList();
     }
 
     static String receiverFor(Mall mall) {

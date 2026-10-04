@@ -4,13 +4,9 @@ import com.mallhub.dto.MallDtos;
 import com.mallhub.dto.PeopleDtos;
 import com.mallhub.entity.Store;
 import com.mallhub.entity.StoreProduct;
-import com.mallhub.entity.StoreTenant;
-import com.mallhub.entity.Tenant;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +17,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class StoreService {
+    private static final Sort BY_STORE = Sort.by("storeId");
+
     private final StoreRepository stores;
     private final ProductRepository products;
     private final StoreProductRepository links;
@@ -42,11 +40,11 @@ public class StoreService {
                 s.getAreaSqft(), s.getStoreName(), s.getStatus(), s.getListingMedia(), s.getMallId());
     }
 
-    public Page<MallDtos.StoreResponse> available(Integer mallId, Pageable pageable) {
+    public List<MallDtos.StoreResponse> available(Integer mallId) {
         return (mallId == null
-                ? stores.findByStatus("available", pageable)
-                : stores.findByMallIdAndStatus(mallId, "available", pageable))
-                .map(StoreService::toResponse);
+                ? stores.findByStatus("available", BY_STORE)
+                : stores.findByMallIdAndStatus(mallId, "available", BY_STORE))
+                .stream().map(StoreService::toResponse).toList();
     }
 
     public MallDtos.StoreResponse get(Integer id) {
@@ -57,15 +55,15 @@ public class StoreService {
         return stores.findById(id).orElseThrow(() -> ApiException.notFound("Store"));
     }
 
-    public Page<MallDtos.ProductResponse> productsByStore(Integer storeId, Pageable pageable) {
+    public List<MallDtos.ProductResponse> productsByStore(Integer storeId) {
         require(storeId);
-        Page<StoreProduct> page = links.findByIdStoreId(storeId, pageable);
-        // One extra query for the whole page instead of one per link.
+        List<StoreProduct> page = links.findByIdStoreIdOrderByIdProductIdAsc(storeId);
+        // One extra query for the whole list instead of one per link.
         Map<Integer, com.mallhub.entity.Product> byId = products
-                .findAllById(page.getContent().stream().map(l -> l.getId().getProductId()).toList())
+                .findAllById(page.stream().map(l -> l.getId().getProductId()).toList())
                 .stream().collect(Collectors.toMap(com.mallhub.entity.Product::getProductId,
                         Function.identity()));
-        return new PageImpl<>(page.getContent().stream()
+        return page.stream()
                 .map(l -> {
                     var p = byId.get(l.getId().getProductId());
                     return p == null ? null : new MallDtos.ProductResponse(p.getProductId(),
@@ -73,7 +71,7 @@ public class StoreService {
                             l.getToShow(), null);
                 })
                 .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toList()), page.getPageable(), page.getTotalElements());
+                .toList();
     }
 
     @Transactional
@@ -97,14 +95,16 @@ public class StoreService {
         link.setToShow(toShow != null && toShow);
     }
 
-    public Page<PeopleDtos.EmployeeResponse> employeesByStore(Integer storeId, Pageable pageable) {
+    public List<PeopleDtos.EmployeeResponse> employeesByStore(Integer storeId) {
         require(storeId);
-        return employees.findByStoreId(storeId, pageable).map(EmployeeService::toResponse);
+        return employees.findByStoreIdOrderByEmployeeIdAsc(storeId).stream()
+                .map(EmployeeService::toResponse).toList();
     }
 
-    public Page<MallDtos.OfferResponse> offersByStore(Integer storeId, Pageable pageable) {
+    public List<MallDtos.OfferResponse> offersByStore(Integer storeId) {
         require(storeId);
-        return offers.findByIdStoreId(storeId, pageable).map(StoreService::toOffer);
+        return offers.findByIdStoreIdOrderByIdOfferIdAsc(storeId).stream()
+                .map(StoreService::toOffer).toList();
     }
 
     @Transactional

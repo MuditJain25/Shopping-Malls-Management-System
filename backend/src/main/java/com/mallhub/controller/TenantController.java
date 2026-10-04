@@ -1,6 +1,5 @@
 package com.mallhub.controller;
 
-import com.mallhub.dto.Paging;
 import com.mallhub.dto.PeopleDtos;
 import com.mallhub.exception.ApiException;
 import com.mallhub.service.EmployeeService;
@@ -21,10 +20,8 @@ public class TenantController {
     }
 
     @GetMapping
-    public Object list(@RequestParam(required = false) Integer mallId,
-                       @RequestParam(required = false) Integer page,
-                       @RequestParam(required = false) Integer size) {
-        return Paging.shape(tenants.list(mallId, Paging.pageable(page, size, "tenantId")), page);
+    public Object list(@RequestParam(required = false) Integer mallId) {
+        return tenants.list(mallId);
     }
 
     @GetMapping("/{id}")
@@ -50,11 +47,8 @@ public class TenantController {
     }
 
     @GetMapping("/{id}/employees")
-    public Object employeesByTenant(@PathVariable Integer id,
-                                    @RequestParam(required = false) Integer page,
-                                    @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "employeeId");
-        return Paging.shape(tenants.employeesByTenant(id, p), page);
+    public Object employeesByTenant(@PathVariable Integer id) {
+        return tenants.employeesByTenant(id);
     }
 
     @PostMapping("/{id}/employees")
@@ -68,10 +62,7 @@ public class TenantController {
     }
 
     @GetMapping("/{id}/transactions")
-    public Object transactions(@PathVariable Integer id,
-                               @RequestParam(required = false) Integer page,
-                               @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "transactionId");
-        return Paging.shape(tenants.transactionsByTenant(id, p), page);
+    public Object transactions(@PathVariable Integer id) {
+        return tenants.transactionsByTenant(id);
     }
 }

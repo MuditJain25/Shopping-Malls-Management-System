@@ -6,9 +6,7 @@ import com.mallhub.entity.Mall;
 import com.mallhub.entity.Store;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +15,11 @@ import java.util.stream.Collectors;
 
 @Service
 public class MallService {
+    private static final Sort BY_MALL = Sort.by("mallId");
+    private static final Sort BY_STORE = Sort.by("storeId");
+    private static final Sort BY_EMPLOYEE = Sort.by("employeeId");
+    private static final Sort BY_OFFER = Sort.by("id.offerId");
+
     private final MallRepository malls;
     private final MallContactNumberRepository contacts;
     private final StoreRepository stores;
@@ -38,10 +41,8 @@ public class MallService {
         this.offers = offers;
     }
 
-    public Page<MallDtos.MallResponse> list(String q, String city, Pageable pageable) {
-        Page<Mall> page = malls.search(blankToNull(q), blankToNull(city), pageable);
-        return new PageImpl<>(toResponses(page.getContent()), page.getPageable(),
-                page.getTotalElements());
+    public List<MallDtos.MallResponse> list(String q, String city) {
+        return toResponses(malls.search(blankToNull(q), blankToNull(city), BY_MALL));
     }
 
     private String blankToNull(String value) {
@@ -58,7 +59,7 @@ public class MallService {
         return toResponse(m, numbers);
     }
 
-    /** One contact-number query for the whole page instead of one per mall. */
+    /** One contact-number query for the whole list instead of one per mall. */
     public List<MallDtos.MallResponse> toResponses(List<Mall> batch) {
         if (batch.isEmpty()) return List.of();
         Map<Integer, List<String>> byMall = contacts.findByIdMallIdIn(
@@ -76,9 +77,9 @@ public class MallService {
                 m.getLatitude(), m.getLongitude(), numbers, m.getImageUrl(), m.getDescription());
     }
 
-    public Page<MallDtos.StoreResponse> storesByMall(Integer mallId, Pageable pageable) {
+    public List<MallDtos.StoreResponse> storesByMall(Integer mallId) {
         ensureMall(mallId);
-        return stores.findByMallId(mallId, pageable).map(StoreService::toResponse);
+        return stores.findByMallId(mallId, BY_STORE).stream().map(StoreService::toResponse).toList();
     }
 
     public List<MallDtos.ProductResponse> topProducts(Integer mallId) {
@@ -103,18 +104,17 @@ public class MallService {
                 .orElse(null);
     }
 
-    public Page<PeopleDtos.EmployeeResponse> employeesByMall(Integer mallId, Integer storeId,
-                                                            Pageable pageable) {
+    public List<PeopleDtos.EmployeeResponse> employeesByMall(Integer mallId, Integer storeId) {
         ensureMall(mallId);
         return (storeId == null
-                ? employees.findByMallId(mallId, pageable)
-                : employees.findByMallIdAndStoreId(mallId, storeId, pageable))
-                .map(EmployeeService::toResponse);
+                ? employees.findByMallId(mallId, BY_EMPLOYEE)
+                : employees.findByMallIdAndStoreId(mallId, storeId, BY_EMPLOYEE))
+                .stream().map(EmployeeService::toResponse).toList();
     }
 
-    public Page<MallDtos.OfferResponse> offersByMall(Integer mallId, Pageable pageable) {
+    public List<MallDtos.OfferResponse> offersByMall(Integer mallId) {
         ensureMall(mallId);
-        return offers.findByMall(mallId, pageable).map(StoreService::toOffer);
+        return offers.findByMall(mallId, BY_OFFER).stream().map(StoreService::toOffer).toList();
     }
 
     public List<MallDtos.MallResponse> mallsByExecutive(Integer executiveId) {

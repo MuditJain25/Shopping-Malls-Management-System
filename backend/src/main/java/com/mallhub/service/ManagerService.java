@@ -4,12 +4,12 @@ import com.mallhub.dto.PeopleDtos;
 import com.mallhub.entity.MallManager;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class ManagerService {
@@ -29,8 +29,8 @@ public class ManagerService {
         this.executives = executives;
     }
 
-    public Page<PeopleDtos.ManagerResponse> list(Pageable pageable) {
-        return managers.findAll(pageable).map(ManagerService::toResponse);
+    public List<PeopleDtos.ManagerResponse> list() {
+        return managers.findAll(Sort.by("managerId")).stream().map(ManagerService::toResponse).toList();
     }
 
     public PeopleDtos.ManagerResponse get(Integer id) {

@@ -6,8 +6,6 @@ import com.mallhub.entity.Employee;
 import com.mallhub.entity.LeaveRequest;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,9 +63,10 @@ public class EmployeeService {
         employees.deleteById(id);
     }
 
-    public Page<PeopleDtos.LeaveResponse> leaves(Integer empId, Pageable pageable) {
+    public List<PeopleDtos.LeaveResponse> leaves(Integer empId) {
         require(empId);
-        return leaves.findByIdEmployeeId(empId, pageable).map(EmployeeService::toLeave);
+        return leaves.findByIdEmployeeIdOrderByIdRequestIdAsc(empId).stream()
+                .map(EmployeeService::toLeave).toList();
     }
 
     @Transactional
@@ -102,20 +101,20 @@ public class EmployeeService {
         return toLeave(l);
     }
 
-    public Page<PeopleDtos.PayrollResponse> payroll(Integer empId, Pageable pageable) {
+    public List<PeopleDtos.PayrollResponse> payroll(Integer empId) {
         require(empId);
-        return payroll.findByIdEmployeeId(empId, pageable)
+        return payroll.findByIdEmployeeIdOrderByIdRecordIdAsc(empId).stream()
                 .map(p -> new PeopleDtos.PayrollResponse(p.getId().getEmployeeId(),
-                        p.getId().getRecordId(), p.getAmount(), p.getRecordType(), p.getIssueDate()));
+                        p.getId().getRecordId(), p.getAmount(), p.getRecordType(), p.getIssueDate()))
+                .toList();
     }
 
-    public Page<PeopleDtos.AttendanceResponse> attendance(Integer empId, LocalDate from, LocalDate to,
-                                                        Pageable pageable) {
+    public List<PeopleDtos.AttendanceResponse> attendance(Integer empId, LocalDate from, LocalDate to) {
         require(empId);
         return (from != null && to != null
-                ? attendance.findByIdEmployeeIdAndIdDateBetween(empId, from, to, pageable)
-                : attendance.findByIdEmployeeIdOrderByIdDateDesc(empId, pageable))
-                .map(EmployeeService::toAttendance);
+                ? attendance.findByIdEmployeeIdAndIdDateBetweenOrderByIdDateAsc(empId, from, to)
+                : attendance.findByIdEmployeeIdOrderByIdDateDesc(empId))
+                .stream().map(EmployeeService::toAttendance).toList();
     }
 
     @Transactional

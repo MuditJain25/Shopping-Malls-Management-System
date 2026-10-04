@@ -1,21 +1,18 @@
 package com.mallhub.repository;
 
 import com.mallhub.entity.Bid;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface BidRepository extends JpaRepository<Bid, Bid.Id> {
-    Page<Bid> findByEventIdAndStoreIdOrderByRoundNumberAsc(Integer eventId, Integer storeId,
-                                                          Pageable pageable);
+    List<Bid> findByEventIdAndStoreIdOrderByRoundNumberAsc(Integer eventId, Integer storeId);
 
     Optional<Bid> findByEventIdAndStoreIdAndStatus(Integer eventId, Integer storeId, String status);
 
     int countByEventIdAndStoreId(Integer eventId, Integer storeId);
 
-    // Batches the winning-bid lookup for a whole page of events (at most one winner per event).
+    // Batches the winning-bid lookup for a whole list of events (at most one winner per event).
     List<Bid> findByStatusAndEventIdIn(String status, List<Integer> eventIds);
 }

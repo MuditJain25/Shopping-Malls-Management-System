@@ -6,9 +6,7 @@ import com.mallhub.entity.StoreTenant;
 import com.mallhub.entity.Tenant;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +17,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class TenantService {
+    private static final Sort BY_TENANT = Sort.by("tenantId");
+    private static final Sort BY_EMPLOYEE = Sort.by("employeeId");
+
     private final TenantRepository tenants;
     private final StoreTenantRepository joins;
     private final StoreRepository stores;
@@ -35,11 +36,10 @@ public class TenantService {
         this.transactions = transactions;
     }
 
-    public Page<PeopleDtos.TenantResponse> list(Integer mallId, Pageable pageable) {
-        Page<Tenant> page = mallId == null
-                ? tenants.findAll(pageable) : tenants.findByMall(mallId, pageable);
-        return new PageImpl<>(toResponses(page.getContent()), page.getPageable(),
-                page.getTotalElements());
+    public List<PeopleDtos.TenantResponse> list(Integer mallId) {
+        return toResponses(mallId == null
+                ? tenants.findAll(BY_TENANT)
+                : tenants.findByMall(mallId, BY_TENANT));
     }
 
     public PeopleDtos.TenantResponse get(Integer id) {
@@ -91,14 +91,16 @@ public class TenantService {
         return joins.existsByIdTenantIdAndIdStoreId(tenantId, storeId);
     }
 
-    public Page<PeopleDtos.EmployeeResponse> employeesByTenant(Integer tenantId, Pageable pageable) {
+    public List<PeopleDtos.EmployeeResponse> employeesByTenant(Integer tenantId) {
         require(tenantId);
-        return employees.findByTenant(tenantId, pageable).map(EmployeeService::toResponse);
+        return employees.findByTenant(tenantId, BY_EMPLOYEE).stream()
+                .map(EmployeeService::toResponse).toList();
     }
 
-    public Page<PeopleDtos.TransactionResponse> transactionsByTenant(Integer tenantId, Pageable pageable) {
+    public List<PeopleDtos.TransactionResponse> transactionsByTenant(Integer tenantId) {
         var t = require(tenantId);
-        return transactions.findBySender(t.getBusinessName(), pageable).map(TenantService::toResponse);
+        return transactions.findBySenderOrderByTransactionIdAsc(t.getBusinessName()).stream()
+                .map(TenantService::toResponse).toList();
     }
 
     List<Integer> storeIds(Integer tenantId) {
@@ -106,7 +108,7 @@ public class TenantService {
                 .map(j -> j.getId().getStoreId()).toList();
     }
 
-    /** One join query for the whole page instead of one per tenant. */
+    /** One join query for the whole list instead of one per tenant. */
     List<PeopleDtos.TenantResponse> toResponses(List<Tenant> batch) {
         if (batch.isEmpty()) return List.of();
         Map<Integer, List<Integer>> storeIdsByTenant = joins.findByIdTenantIdIn(
