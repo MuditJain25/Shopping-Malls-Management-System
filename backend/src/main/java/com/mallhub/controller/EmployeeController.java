@@ -1,5 +1,6 @@
 package com.mallhub.controller;
 
+import com.mallhub.dto.Paging;
 import com.mallhub.dto.PeopleDtos;
 import com.mallhub.service.EmployeeService;
 import jakarta.validation.Valid;
@@ -30,8 +31,11 @@ public class EmployeeController {
     }
 
     @GetMapping("/{id}/leave-requests")
-    public Object leaves(@PathVariable Integer id) {
-        return employees.leaves(id);
+    public Object leaves(@PathVariable Integer id,
+                         @RequestParam(required = false) Integer page,
+                         @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "id.requestId");
+        return Paging.shape(employees.leaves(id, p), page);
     }
 
     @PostMapping("/{id}/leave-requests")
@@ -48,15 +52,21 @@ public class EmployeeController {
     }
 
     @GetMapping("/{id}/payroll")
-    public Object payroll(@PathVariable Integer id) {
-        return employees.payroll(id);
+    public Object payroll(@PathVariable Integer id,
+                          @RequestParam(required = false) Integer page,
+                          @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "id.recordId");
+        return Paging.shape(employees.payroll(id, p), page);
     }
 
     @GetMapping("/{id}/attendance")
     public Object attendance(@PathVariable Integer id,
                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return employees.attendance(id, from, to);
+                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                             @RequestParam(required = false) Integer page,
+                             @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "id.date");
+        return Paging.shape(employees.attendance(id, from, to, p), page);
     }
 
     @PostMapping("/{id}/attendance/check-in")

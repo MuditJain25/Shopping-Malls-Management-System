@@ -1,14 +1,23 @@
 package com.mallhub.service;
 
 import com.mallhub.dto.MallDtos;
+import com.mallhub.dto.PeopleDtos;
 import com.mallhub.entity.Store;
 import com.mallhub.entity.StoreProduct;
+import com.mallhub.entity.StoreTenant;
+import com.mallhub.entity.Tenant;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class StoreService {
@@ -33,29 +42,38 @@ public class StoreService {
                 s.getAreaSqft(), s.getStoreName(), s.getStatus(), s.getListingMedia(), s.getMallId());
     }
 
-    public List<MallDtos.StoreResponse> available(Integer mallId) {
-        List<Store> all = mallId == null ? stores.findByStatus("available")
-                : stores.findByMallIdAndStatus(mallId, "available");
-        return all.stream().map(StoreService::toResponse).toList();
+    public Page<MallDtos.StoreResponse> available(Integer mallId, Pageable pageable) {
+        return (mallId == null
+                ? stores.findByStatus("available", pageable)
+                : stores.findByMallIdAndStatus(mallId, "available", pageable))
+                .map(StoreService::toResponse);
     }
 
     public MallDtos.StoreResponse get(Integer id) {
-        return toResponse(stores.findById(id).orElseThrow(() -> ApiException.notFound("Store")));
+        return toResponse(require(id));
     }
 
     public Store require(Integer id) {
         return stores.findById(id).orElseThrow(() -> ApiException.notFound("Store"));
     }
 
-    public List<MallDtos.ProductResponse> productsByStore(Integer storeId) {
+    public Page<MallDtos.ProductResponse> productsByStore(Integer storeId, Pageable pageable) {
         require(storeId);
-        return links.findByIdStoreId(storeId).stream()
-                .map(sp -> products.findById(sp.getId().getProductId()).map(p ->
-                        new MallDtos.ProductResponse(p.getProductId(), p.getProductName(),
-                                p.getCategory(), p.getPrice(), p.getImageUrl(), sp.getToShow(), null))
-                        .orElse(null))
-                .filter(p -> p != null)
-                .toList();
+        Page<StoreProduct> page = links.findByIdStoreId(storeId, pageable);
+        // One extra query for the whole page instead of one per link.
+        Map<Integer, com.mallhub.entity.Product> byId = products
+                .findAllById(page.getContent().stream().map(l -> l.getId().getProductId()).toList())
+                .stream().collect(Collectors.toMap(com.mallhub.entity.Product::getProductId,
+                        Function.identity()));
+        return new PageImpl<>(page.getContent().stream()
+                .map(l -> {
+                    var p = byId.get(l.getId().getProductId());
+                    return p == null ? null : new MallDtos.ProductResponse(p.getProductId(),
+                            p.getProductName(), p.getCategory(), p.getPrice(), p.getImageUrl(),
+                            l.getToShow(), null);
+                })
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList()), page.getPageable(), page.getTotalElements());
     }
 
     @Transactional
@@ -74,19 +92,19 @@ public class StoreService {
 
     @Transactional
     public void setVisibility(Integer storeId, Integer productId, Boolean toShow) {
-        var id = new StoreProduct.Id(storeId, productId);
-        var link = links.findById(id).orElseThrow(() -> ApiException.notFound("Store product"));
+        var link = links.findById(new StoreProduct.Id(storeId, productId))
+                .orElseThrow(() -> ApiException.notFound("Store product"));
         link.setToShow(toShow != null && toShow);
     }
 
-    public List<com.mallhub.dto.PeopleDtos.EmployeeResponse> employeesByStore(Integer storeId) {
+    public Page<PeopleDtos.EmployeeResponse> employeesByStore(Integer storeId, Pageable pageable) {
         require(storeId);
-        return employees.findByStoreId(storeId).stream().map(EmployeeService::toResponse).toList();
+        return employees.findByStoreId(storeId, pageable).map(EmployeeService::toResponse);
     }
 
-    public List<MallDtos.OfferResponse> offersByStore(Integer storeId) {
+    public Page<MallDtos.OfferResponse> offersByStore(Integer storeId, Pageable pageable) {
         require(storeId);
-        return offers.findByIdStoreId(storeId).stream().map(StoreService::toOffer).toList();
+        return offers.findByIdStoreId(storeId, pageable).map(StoreService::toOffer);
     }
 
     @Transactional

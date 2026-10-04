@@ -9,8 +9,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/tenants")
 public class TenantController {
@@ -25,9 +23,8 @@ public class TenantController {
     @GetMapping
     public Object list(@RequestParam(required = false) Integer mallId,
                        @RequestParam(required = false) Integer page,
-                       @RequestParam(required = false) Integer size,
-                       @RequestParam(required = false, name = "sort") List<String> sort) {
-        return Paging.wrap(tenants.list(mallId), page, size, sort);
+                       @RequestParam(required = false) Integer size) {
+        return Paging.shape(tenants.list(mallId, Paging.pageable(page, size, "tenantId")), page);
     }
 
     @GetMapping("/{id}")
@@ -53,21 +50,28 @@ public class TenantController {
     }
 
     @GetMapping("/{id}/employees")
-    public Object employees(@PathVariable Integer id) {
-        return tenants.employeesByTenant(id);
+    public Object employeesByTenant(@PathVariable Integer id,
+                                    @RequestParam(required = false) Integer page,
+                                    @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "employeeId");
+        return Paging.shape(tenants.employeesByTenant(id, p), page);
     }
 
     @PostMapping("/{id}/employees")
     @ResponseStatus(HttpStatus.CREATED)
     public Object addEmployee(@PathVariable Integer id,
                               @Valid @RequestBody PeopleDtos.EmployeeCreateRequest req) {
-        boolean owns = tenants.storesByTenant(id).stream().anyMatch(s -> s.storeId().equals(req.storeId()));
-        if (!owns) throw ApiException.badRequest("Store does not belong to this tenant");
+        if (!tenants.ownsStore(id, req.storeId())) {
+            throw ApiException.badRequest("Store does not belong to this tenant");
+        }
         return employees.create(req);
     }
 
     @GetMapping("/{id}/transactions")
-    public Object transactions(@PathVariable Integer id) {
-        return tenants.transactionsByTenant(id);
+    public Object transactions(@PathVariable Integer id,
+                               @RequestParam(required = false) Integer page,
+                               @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "transactionId");
+        return Paging.shape(tenants.transactionsByTenant(id, p), page);
     }
 }

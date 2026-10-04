@@ -2,26 +2,17 @@ package com.mallhub.controller;
 
 import com.mallhub.dto.Paging;
 import com.mallhub.service.BidService;
-import com.mallhub.service.EmployeeService;
 import com.mallhub.service.MallService;
-import com.mallhub.service.StoreService;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/malls")
 public class MallController {
     private final MallService malls;
-    private final StoreService stores;
-    private final EmployeeService employees;
     private final BidService bids;
 
-    public MallController(MallService malls, StoreService stores,
-                          EmployeeService employees, BidService bids) {
+    public MallController(MallService malls, BidService bids) {
         this.malls = malls;
-        this.stores = stores;
-        this.employees = employees;
         this.bids = bids;
     }
 
@@ -29,9 +20,8 @@ public class MallController {
     public Object list(@RequestParam(required = false) String q,
                        @RequestParam(required = false) String city,
                        @RequestParam(required = false) Integer page,
-                       @RequestParam(required = false) Integer size,
-                       @RequestParam(required = false, name = "sort") List<String> sort) {
-        return Paging.wrap(malls.list(q, city), page, size, sort);
+                       @RequestParam(required = false) Integer size) {
+        return Paging.shape(malls.list(q, city, Paging.pageable(page, size, "mallId")), page);
     }
 
     @GetMapping("/{id}")
@@ -40,8 +30,10 @@ public class MallController {
     }
 
     @GetMapping("/{id}/stores")
-    public Object stores(@PathVariable Integer id) {
-        return malls.storesByMall(id);
+    public Object stores(@PathVariable Integer id,
+                         @RequestParam(required = false) Integer page,
+                         @RequestParam(required = false) Integer size) {
+        return Paging.shape(malls.storesByMall(id, Paging.pageable(page, size, "storeId")), page);
     }
 
     @GetMapping("/{id}/products/top")
@@ -56,21 +48,26 @@ public class MallController {
 
     @GetMapping("/{id}/employees")
     public Object employees(@PathVariable Integer id,
-                            @RequestParam(required = false) Integer storeId) {
-        var all = employees.byMall(id);
-        if (storeId != null) all = all.stream().filter(e -> storeId.equals(e.storeId())).toList();
-        return all;
+                            @RequestParam(required = false) Integer storeId,
+                            @RequestParam(required = false) Integer page,
+                            @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "employeeId");
+        return Paging.shape(malls.employeesByMall(id, storeId, p), page);
     }
 
     @GetMapping("/{id}/bid-events")
     public Object bidEvents(@PathVariable Integer id,
-                            @RequestParam(required = false) String status) {
-        return bids.list(id, status);
+                            @RequestParam(required = false) String status,
+                            @RequestParam(required = false) Integer page,
+                            @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "id.eventId");
+        return Paging.shape(bids.list(id, status, p), page);
     }
 
     @GetMapping("/{id}/offers")
-    public Object offers(@PathVariable Integer id) {
-        return malls.storesByMall(id).stream()
-                .flatMap(s -> stores.offersByStore(s.storeId()).stream()).toList();
+    public Object offers(@PathVariable Integer id,
+                         @RequestParam(required = false) Integer page,
+                         @RequestParam(required = false) Integer size) {
+        return Paging.shape(malls.offersByMall(id, Paging.pageable(page, size, "id.offerId")), page);
     }
 }

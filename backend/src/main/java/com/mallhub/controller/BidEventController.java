@@ -7,8 +7,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/bid-events")
 public class BidEventController {
@@ -22,9 +20,9 @@ public class BidEventController {
     public Object list(@RequestParam(required = false) Integer mallId,
                        @RequestParam(required = false) String status,
                        @RequestParam(required = false) Integer page,
-                       @RequestParam(required = false) Integer size,
-                       @RequestParam(required = false, name = "sort") List<String> sort) {
-        return Paging.wrap(bids.list(mallId, status), page, size, sort);
+                       @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "id.eventId");
+        return Paging.shape(bids.list(mallId, status, p), page);
     }
 
     @GetMapping("/{id}")
@@ -33,8 +31,11 @@ public class BidEventController {
     }
 
     @GetMapping("/{id}/bids")
-    public Object bids(@PathVariable Integer id) {
-        return bids.bidsByEvent(id);
+    public Object bids(@PathVariable Integer id,
+                       @RequestParam(required = false) Integer page,
+                       @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "roundNumber");
+        return Paging.shape(bids.bidsByEvent(id, p), page);
     }
 
     @PostMapping("/{id}/bids")

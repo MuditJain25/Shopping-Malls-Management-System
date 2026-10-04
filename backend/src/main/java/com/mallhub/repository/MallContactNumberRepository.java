@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface MallContactNumberRepository extends JpaRepository<MallContactNumber, MallContactNumber.Id> {
     List<MallContactNumber> findByIdMallId(Integer mallId);
+
+    List<MallContactNumber> findByIdMallIdIn(List<Integer> mallIds);
 }

@@ -1,5 +1,6 @@
 package com.mallhub.controller;
 
+import com.mallhub.dto.Paging;
 import com.mallhub.dto.PeopleDtos;
 import com.mallhub.service.ManagerService;
 import jakarta.validation.Valid;
@@ -16,8 +17,9 @@ public class ManagerController {
     }
 
     @GetMapping
-    public Object list() {
-        return managers.list();
+    public Object list(@RequestParam(required = false) Integer page,
+                       @RequestParam(required = false) Integer size) {
+        return Paging.shape(managers.list(Paging.pageable(page, size, "managerId")), page);
     }
 
     @GetMapping("/{id}")

@@ -4,7 +4,6 @@ import com.mallhub.dto.MallDtos;
 import com.mallhub.dto.PeopleDtos;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.ExecutiveRepository;
-import com.mallhub.repository.MallRepository;
 import com.mallhub.repository.OverseesRepository;
 import org.springframework.stereotype.Service;
 
@@ -15,14 +14,12 @@ public class ExecutiveService {
     private final ExecutiveRepository executives;
     private final OverseesRepository oversees;
     private final MallService malls;
-    private final MallRepository mallRepository;
 
     public ExecutiveService(ExecutiveRepository executives, OverseesRepository oversees,
-                            MallService malls, MallRepository mallRepository) {
+                            MallService malls) {
         this.executives = executives;
         this.oversees = oversees;
         this.malls = malls;
-        this.mallRepository = mallRepository;
     }
 
     public PeopleDtos.ExecutiveResponse get(Integer id) {
@@ -35,9 +32,6 @@ public class ExecutiveService {
 
     public List<MallDtos.MallResponse> mallsByExecutive(Integer id) {
         if (!executives.existsById(id)) throw ApiException.notFound("Executive");
-        return oversees.findByIdExecutiveId(id).stream()
-                .map(o -> mallRepository.findById(o.getId().getMallId()).orElse(null))
-                .filter(m -> m != null)
-                .map(malls::toResponse).toList();
+        return malls.mallsByExecutive(id);
     }
 }

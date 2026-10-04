@@ -5,38 +5,36 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-import java.util.List;
-
-// Optional pagination: controllers return a plain list unless ?page= is given.
+// Filtering, ordering and limiting are done by the database; this only builds the Pageable
+// and picks the response shape (bare array unless ?page= was requested).
 public final class Paging {
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
+
     private Paging() {
     }
 
-    public static Pageable pageable(Integer page, Integer size, List<String> sorts) {
-        Sort sort = Sort.unsorted();
-        if (sorts != null) {
-            for (String s : sorts) {
-                String[] parts = s.split(",");
-                sort = sort.and(Sort.by(
-                        parts.length > 1 && parts[1].equalsIgnoreCase("desc")
-                                ? Sort.Direction.DESC : Sort.Direction.ASC,
-                        parts[0]));
-            }
-        }
-        return PageRequest.of(page, Math.min(size == null ? 20 : size, 100), sort);
+    /**
+     * @param defaultSort entity property to order by. Always applied: LIMIT/OFFSET over an
+     *                    unordered query returns overlapping and missing rows across pages.
+     */
+    public static Pageable pageable(Integer page, Integer size, String defaultSort) {
+        Sort sort = Sort.by(defaultSort);
+        return page == null
+                ? PageRequest.of(0, Integer.MAX_VALUE, sort)
+                : PageRequest.of(page, clamp(size), sort);
     }
 
-    public static <T> Object wrap(List<T> all, Integer page, Integer size, List<String> sorts) {
-        if (page == null) {
-            return all;
+    private static int clamp(Integer size) {
+        if (size == null) return DEFAULT_SIZE;
+        return Math.min(Math.max(size, 1), MAX_SIZE);
+    }
+
+    public static <T> Object shape(Page<T> result, Integer requestedPage) {
+        if (requestedPage == null) {
+            return result.getContent();
         }
-        Pageable p = pageable(page, size, sorts);
-        int from = Math.min((int) p.getOffset(), all.size());
-        int to = Math.min(from + p.getPageSize(), all.size());
-        List<T> slice = all.subList(from, to);
-        int totalPages = (int) Math.ceil((double) all.size() / p.getPageSize());
-        Page<T> result = new org.springframework.data.domain.PageImpl<>(slice, p, all.size());
-        return new PageEnvelope<>(result.getContent(), page, p.getPageSize(),
-                all.size(), totalPages, page >= totalPages - 1);
+        return new PageEnvelope<>(result.getContent(), result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages(), result.isLast());
     }
 }

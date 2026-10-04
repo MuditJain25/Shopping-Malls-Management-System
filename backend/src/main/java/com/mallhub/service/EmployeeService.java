@@ -6,6 +6,8 @@ import com.mallhub.entity.Employee;
 import com.mallhub.entity.LeaveRequest;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,11 +40,7 @@ public class EmployeeService {
     }
 
     public PeopleDtos.EmployeeResponse get(Integer id) {
-        return toResponse(employees.findById(id).orElseThrow(() -> ApiException.notFound("Employee")));
-    }
-
-    public List<PeopleDtos.EmployeeResponse> byMall(Integer mallId) {
-        return employees.findByMallId(mallId).stream().map(EmployeeService::toResponse).toList();
+        return toResponse(require(id));
     }
 
     @Transactional
@@ -67,9 +65,9 @@ public class EmployeeService {
         employees.deleteById(id);
     }
 
-    public List<PeopleDtos.LeaveResponse> leaves(Integer empId) {
+    public Page<PeopleDtos.LeaveResponse> leaves(Integer empId, Pageable pageable) {
         require(empId);
-        return leaves.findByIdEmployeeId(empId).stream().map(EmployeeService::toLeave).toList();
+        return leaves.findByIdEmployeeId(empId, pageable).map(EmployeeService::toLeave);
     }
 
     @Transactional
@@ -104,20 +102,20 @@ public class EmployeeService {
         return toLeave(l);
     }
 
-    public List<PeopleDtos.PayrollResponse> payroll(Integer empId) {
+    public Page<PeopleDtos.PayrollResponse> payroll(Integer empId, Pageable pageable) {
         require(empId);
-        return payroll.findByIdEmployeeId(empId).stream()
+        return payroll.findByIdEmployeeId(empId, pageable)
                 .map(p -> new PeopleDtos.PayrollResponse(p.getId().getEmployeeId(),
-                        p.getId().getRecordId(), p.getAmount(), p.getRecordType(), p.getIssueDate()))
-                .toList();
+                        p.getId().getRecordId(), p.getAmount(), p.getRecordType(), p.getIssueDate()));
     }
 
-    public List<PeopleDtos.AttendanceResponse> attendance(Integer empId, LocalDate from, LocalDate to) {
+    public Page<PeopleDtos.AttendanceResponse> attendance(Integer empId, LocalDate from, LocalDate to,
+                                                        Pageable pageable) {
         require(empId);
-        List<Attendance> rows = from != null && to != null
-                ? attendance.findByIdEmployeeIdAndIdDateBetween(empId, from, to)
-                : attendance.findByIdEmployeeIdOrderByIdDateDesc(empId);
-        return rows.stream().map(EmployeeService::toAttendance).toList();
+        return (from != null && to != null
+                ? attendance.findByIdEmployeeIdAndIdDateBetween(empId, from, to, pageable)
+                : attendance.findByIdEmployeeIdOrderByIdDateDesc(empId, pageable))
+                .map(EmployeeService::toAttendance);
     }
 
     @Transactional
@@ -151,8 +149,8 @@ public class EmployeeService {
         return toAttendance(row);
     }
 
-    private void require(Integer empId) {
-        if (!employees.existsById(empId)) throw ApiException.notFound("Employee");
+    private Employee require(Integer empId) {
+        return employees.findById(empId).orElseThrow(() -> ApiException.notFound("Employee"));
     }
 
     static PeopleDtos.LeaveResponse toLeave(LeaveRequest l) {
