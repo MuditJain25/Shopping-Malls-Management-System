@@ -17,12 +17,10 @@ const ROLE_DASHBOARDS = {
 
 export default function AuthPage() {
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [demoEmail, setDemoEmail] = useState('');
   const buttonSlot = useRef(null);
 
-  const { loginWithGoogle, loginWithEmail } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const { navigate } = useRouter();
 
   const goToDashboard = useCallback(
@@ -74,20 +72,6 @@ export default function AuthPage() {
     };
   }, [goToDashboard, loginWithGoogle]);
 
-  const handleDemoLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setNotice('');
-    setBusy(true);
-    try {
-      goToDashboard(await loginWithEmail(demoEmail.trim()));
-    } catch (err) {
-      setError(err.message || 'Sign-in failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -103,7 +87,7 @@ export default function AuthPage() {
           <p className="text-sm text-slate-500 mb-5">Use your Google account to continue</p>
 
           {error && <div className="mb-4"><ErrorState message={error} /></div>}
-          {notice && <p className="mb-4 text-sm text-amber-700">{notice}</p>}
+          
 
           {GOOGLE_CLIENT_ID ? (
             <div className="flex justify-center">
@@ -112,38 +96,11 @@ export default function AuthPage() {
           ) : (
             <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
               Google sign-in is not configured. Set <code>VITE_GOOGLE_CLIENT_ID</code> in
-              <code> frontend/.env</code>, or use the demo sign-in below.
+              <code> frontend/.env</code>, then restart the dev server.
             </p>
           )}
 
           {busy && <p className="mt-3 text-center text-sm text-slate-500">Signing in…</p>}
-
-          <div className="my-5 flex items-center gap-3">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs uppercase tracking-wide text-slate-400">or</span>
-            <span className="h-px flex-1 bg-slate-200" />
-          </div>
-
-          <form onSubmit={handleDemoLogin} className="space-y-3">
-            <div>
-              <label className="label">Demo sign-in (email only)</label>
-              <input
-                type="email"
-                value={demoEmail}
-                onChange={(e) => setDemoEmail(e.target.value)}
-                className="input"
-                placeholder="you@gmail.com"
-                required
-              />
-              <p className="mt-1 text-xs text-slate-400">
-                Works only while the backend runs the <code>demo</code> profile, which skips
-                Google verification.
-              </p>
-            </div>
-            <button type="submit" disabled={busy} className="btn-secondary w-full">
-              Continue with email
-            </button>
-          </form>
         </div>
 
         <div className="mt-5 text-center">
