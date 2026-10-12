@@ -991,7 +991,7 @@ export const demoUsers = [
     role: "tenant",
     firstName: "James",
     lastName: "O'Connor",
-    profileId: "t1",
+    profileId: 1,
   },
   {
     id: "u3",

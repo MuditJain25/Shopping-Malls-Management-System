@@ -53,29 +53,34 @@
 //   GET    /api/analytics/mall/{id} → { revenue, customers, avgRevenuePerStore, partners }
 // ═══════════════════════════════════════════════════════════════
 
-import * as mock from './mockData.js';
+import * as mock from "./mockData.js";
 
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
-// function getAuthHeaders() {
-//   const token = localStorage.getItem('auth_token');
-//   return {
-//     'Content-Type': 'application/json',
-//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//   };
-// }
+function getAuthHeaders() {
+  const token = localStorage.getItem("auth_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
-// async function apiFetch(path, options = {}) {
-//   const response = await fetch(`${API_BASE_URL}${path}`, {
-//     ...options,
-//     headers: { ...getAuthHeaders(), ...options.headers },
-//   });
-//   if (!response.ok) {
-//     const error = await response.json().catch(() => ({ message: 'Request failed' }));
-//     throw new Error(error.message || `HTTP ${response.status}`);
-//   }
-//   return response.json();
-// }
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: { ...getAuthHeaders(), ...options.headers },
+  });
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Request failed" }));
+    throw new Error(error.message || `HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
 
 // ── Auth ────────────────────────────────────────────────────────
 export async function apiLogin(email, password) {
@@ -85,13 +90,21 @@ export async function apiLogin(email, password) {
   // });
 
   // MOCK: check against demo users
-  const user = mock.demoUsers.find(u => u.email === email && u.password === password);
-  if (!user) throw new Error('Invalid email or password');
+  const user = mock.demoUsers.find(
+    (u) => u.email === email && u.password === password,
+  );
+  if (!user) throw new Error("Invalid email or password");
   const { password: _pw, ...userWithoutPw } = user;
   return userWithoutPw;
 }
 
-export async function apiSignup({ firstName, lastName, email, password, role }) {
+export async function apiSignup({
+  firstName,
+  lastName,
+  email,
+  password,
+  role,
+}) {
   // return apiFetch('/auth/signup', {
   //   method: 'POST',
   //   body: JSON.stringify({ firstName, lastName, email, password, role }),
@@ -120,8 +133,7 @@ export async function apiGetMalls() {
 }
 
 export async function apiGetMallById(id) {
-  // return apiFetch(`/malls/${id}`);
-  return mock.getMallById(id);
+  return apiFetch(`/malls/${id}`);
 }
 
 // ── Stores ─────────────────────────────────────────────────────
@@ -142,8 +154,7 @@ export async function apiGetStoreById(id) {
 
 // ── Products ───────────────────────────────────────────────────
 export async function apiGetProductsByStore(storeId) {
-  // return apiFetch(`/stores/${storeId}/products`);
-  return mock.getProductsByStore(storeId);
+  return apiFetch(`/stores/${storeId}/products`);
 }
 
 export async function apiGetTopSellingProducts(mallId) {
@@ -176,9 +187,9 @@ export async function apiPlaceBid(eventId, userId, bidAmount, bidderName) {
   //   body: JSON.stringify({ userId, bidAmount }),
   // });
   // MOCK: return a new bid object
-  const eventBids = mock.bids.filter(b => b.event_id === eventId);
-  const winningBid = eventBids.find(b => b.status === 'winning');
-  if (winningBid) winningBid.status = 'outbid';
+  const eventBids = mock.bids.filter((b) => b.event_id === eventId);
+  const winningBid = eventBids.find((b) => b.status === "winning");
+  if (winningBid) winningBid.status = "outbid";
   const newBid = {
     bid_id: `b${Date.now()}`,
     user_id: userId,
@@ -186,7 +197,7 @@ export async function apiPlaceBid(eventId, userId, bidAmount, bidderName) {
     bid_amount: bidAmount,
     round_number: eventBids.length + 1,
     bid_date: new Date().toISOString(),
-    status: 'winning',
+    status: "winning",
     bidder_name: bidderName,
   };
   mock.bids.push(newBid);
@@ -198,9 +209,9 @@ export async function apiFinalizeBidEvent(eventId, allocation) {
   //   method: 'PUT',
   //   body: JSON.stringify({ final_allocation: allocation }),
   // });
-  const event = mock.bidEvents.find(be => be.event_id === eventId);
+  const event = mock.bidEvents.find((be) => be.event_id === eventId);
   if (event) {
-    event.status = 'finalized';
+    event.status = "finalized";
     event.final_allocation = allocation;
   }
   return event;
@@ -218,8 +229,11 @@ export async function apiGetTenantById(id) {
 }
 
 export async function apiGetStoresByTenant(tenantId) {
-  // return apiFetch(`/tenants/${tenantId}/stores`);
-  return mock.getStoresByTenant(tenantId);
+  return apiFetch(`/tenants/${tenantId}/stores`);
+}
+
+export async function apiGetEmployeesByTenant(tenantId) {
+  return apiFetch(`/tenants/${tenantId}/employees`);
 }
 
 export async function apiGetEmployeesByStore(storeId) {
@@ -242,7 +256,10 @@ export async function apiGetRevenueByTenant(tenantId) {
   return mock.getRevenueByTenant(tenantId);
 }
 
-export async function apiSubmitRevenue(tenantId, { description, month, amount }) {
+export async function apiSubmitRevenue(
+  tenantId,
+  { description, month, amount },
+) {
   // return apiFetch(`/tenants/${tenantId}/revenue`, {
   //   method: 'POST',
   //   body: JSON.stringify({ description, month, amount }),
@@ -253,15 +270,14 @@ export async function apiSubmitRevenue(tenantId, { description, month, amount })
     description,
     month,
     amount,
-    submitted_date: new Date().toISOString().split('T')[0],
+    submitted_date: new Date().toISOString().split("T")[0],
   };
   mock.revenueInfo.push(newRecord);
   return newRecord;
 }
 
 export async function apiGetTransactionsByTenant(tenantId) {
-  // return apiFetch(`/tenants/${tenantId}/transactions`);
-  return mock.getTransactionsByTenant(tenantId);
+  return apiFetch(`/tenants/${tenantId}/transactions`);
 }
 
 // ── Mall Employees ─────────────────────────────────────────────
@@ -286,7 +302,11 @@ export async function apiCreateManager(managerData) {
   //   method: 'POST',
   //   body: JSON.stringify(managerData),
   // });
-  const newMgr = { ...managerData, manager_id: `mm${Date.now()}`, date_joined: new Date().toISOString().split('T')[0] };
+  const newMgr = {
+    ...managerData,
+    manager_id: `mm${Date.now()}`,
+    date_joined: new Date().toISOString().split("T")[0],
+  };
   mock.mallManagers.push(newMgr);
   return newMgr;
 }
@@ -294,7 +314,7 @@ export async function apiCreateManager(managerData) {
 // ── Executives ─────────────────────────────────────────────────
 export async function apiGetExecutiveById(id) {
   // return apiFetch(`/executives/${id}`);
-  return mock.executives.find(ex => ex.executive_id === id);
+  return mock.executives.find((ex) => ex.executive_id === id);
 }
 
 // ── Employee Self-Service ──────────────────────────────────────
@@ -318,7 +338,7 @@ export async function apiApplyLeave(empId, { start_date, end_date, reason }) {
     request_id: `lr${Date.now()}`,
     start_date,
     end_date,
-    status: 'pending',
+    status: "pending",
     reason,
   };
   mock.leaveRequests.push(newReq);
@@ -337,23 +357,32 @@ export async function apiGetAttendance(empId) {
 
 export async function apiCheckIn(empId) {
   // return apiFetch(`/employees/${empId}/attendance/check-in`, { method: 'POST' });
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   const time = new Date().toTimeString().slice(0, 5);
-  const existing = mock.attendanceRecords.find(a => a.e_id === empId && a.date === today);
+  const existing = mock.attendanceRecords.find(
+    (a) => a.e_id === empId && a.date === today,
+  );
   if (existing) {
     existing.check_in_time = time;
     return existing;
   }
-  const record = { e_id: empId, date: today, check_in_time: time, check_out_time: null };
+  const record = {
+    e_id: empId,
+    date: today,
+    check_in_time: time,
+    check_out_time: null,
+  };
   mock.attendanceRecords.push(record);
   return record;
 }
 
 export async function apiCheckOut(empId) {
   // return apiFetch(`/employees/${empId}/attendance/check-out`, { method: 'POST' });
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   const time = new Date().toTimeString().slice(0, 5);
-  const existing = mock.attendanceRecords.find(a => a.e_id === empId && a.date === today);
+  const existing = mock.attendanceRecords.find(
+    (a) => a.e_id === empId && a.date === today,
+  );
   if (existing) {
     existing.check_out_time = time;
     return existing;
@@ -366,22 +395,29 @@ export async function apiGetMallAnalytics(mallId) {
   // return apiFetch(`/analytics/mall/${mallId}`);
   // MOCK: compute from mock data
   const mallStores = mock.getStoresByMall(mallId);
-  const occupiedStores = mallStores.filter(s => s.status === 'occupied');
-  const mall = mock.malls.find(m => m.mall_id === mallId);
-  const mallName = mall ? (
-    mall.city === 'New York' ? 'Heritage Plaza Mall' :
-    mall.city === 'San Jose' ? 'Tech Park Mall' :
-    'Lakeshore Mall'
-  ) : '';
-  const mallTransactions = mock.transactions.filter(t => t.receiver === mallName);
+  const occupiedStores = mallStores.filter((s) => s.status === "occupied");
+  const mall = mock.malls.find((m) => m.mall_id === mallId);
+  const mallName = mall
+    ? mall.city === "New York"
+      ? "Heritage Plaza Mall"
+      : mall.city === "San Jose"
+        ? "Tech Park Mall"
+        : "Lakeshore Mall"
+    : "";
+  const mallTransactions = mock.transactions.filter(
+    (t) => t.receiver === mallName,
+  );
   const totalRevenue = mallTransactions.reduce((sum, t) => sum + t.amount, 0);
-  const mallTenants = mock.tenants.filter(t =>
-    t.store_ids.some(sid => mallStores.some(s => s.store_id === sid))
+  const mallTenants = mock.tenants.filter((t) =>
+    t.store_ids.some((sid) => mallStores.some((s) => s.store_id === sid)),
   );
   return {
     totalRevenue,
-    customerCount: 12500 + (mallId === 'm1' ? 3200 : mallId === 'm2' ? 2100 : 1800),
-    avgRevenuePerStore: occupiedStores.length ? Math.round(totalRevenue / occupiedStores.length) : 0,
+    customerCount:
+      12500 + (mallId === "m1" ? 3200 : mallId === "m2" ? 2100 : 1800),
+    avgRevenuePerStore: occupiedStores.length
+      ? Math.round(totalRevenue / occupiedStores.length)
+      : 0,
     partnerCount: mallTenants.length,
     storeCount: mallStores.length,
     occupiedCount: occupiedStores.length,
