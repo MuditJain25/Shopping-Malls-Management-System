@@ -87,7 +87,7 @@ export default function TenantDashboard({ role = "tenant" }) {
     return <Overview role={role} stores={activeStores} tenantId={tenantId} />;
   }
   if (pageKey === "stores" || pageKey === "store") {
-    return <StoresView stores={activeStores} />;
+    return <StoresView stores={activeStores} role={role} />;
   }
   if (pageKey === "products") {
     return <ProductsView stores={activeStores} />;
