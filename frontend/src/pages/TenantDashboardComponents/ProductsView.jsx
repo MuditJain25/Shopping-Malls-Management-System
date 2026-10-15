@@ -1,24 +1,94 @@
-import { useState } from 'react';
-import { Star, Plus } from 'lucide-react';
-import { PageHeader, Badge, EmptyState } from '@/components/ui/index.jsx';
-import Modal from '@/components/ui/Modal.jsx';
+import { useEffect, useState } from "react";
+import { Star, Plus } from "lucide-react";
+import { PageHeader, Badge, EmptyState } from "@/components/ui/index.jsx";
+import Modal from "@/components/ui/Modal.jsx";
+import { apiGetProductsByStore, apiToggleProductVisibility } from "@/lib/api";
 import {
-  getProductsByStore, products, storeProducts, productImages
-} from '@/lib/mockData.js';
+  getProductsByStore,
+  products,
+  storeProducts,
+  productImages,
+} from "@/lib/mockData.js";
 
-export default function ProductsView({ stores }) {
+export default function ProductsView({ stores, role }) {
+  const isShopManager = role === "shop_manager";
+
   const [refresh, setRefresh] = useState(0);
-  const [selectedStore, setSelectedStore] = useState(stores[0]?.store_id || '');
+  const [selectedStore, setSelectedStore] = useState(stores[0]?.store_id || "");
   const [showAdd, setShowAdd] = useState(false);
-  const [newProduct, setNewProduct] = useState({ product_name: '', category: 'Fashion', price: '', imageUrl: '' });
+  const [newProduct, setNewProduct] = useState({
+    product_name: "",
+    category: "Fashion",
+    price: "",
+    imageUrl: "",
+  });
+  const [tenantProducts, setTenantProducts] = useState([]);
 
-  const store = stores.find(s => s.store_id === selectedStore) || stores[0];
-  const storeProductList = store ? getProductsByStore(store.store_id) : [];
+  const store = stores.find((s) => s.store_id === selectedStore) || stores[0];
+  const storeId = store?.store_id;
+  useEffect(() => {
+    if (isShopManager || storeId == null) return;
+
+    let cancelled = false;
+
+    apiGetProductsByStore(storeId)
+      .then((data) => {
+        if (!cancelled) {
+          const products = Array.isArray(data)
+            ? data
+            : (data?.content ?? data?.items ?? []);
+
+          setTenantProducts(
+            products.map((product) => ({
+              ...product,
+              imageUrl: product.image_url,
+            })),
+          );
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load store products", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isShopManager, storeId]);
+
+  const storeProductList = !store
+    ? []
+    : isShopManager
+      ? getProductsByStore(store.store_id)
+      : tenantProducts;
 
   const handleToggle = async (productId, currentShow) => {
-    const sp = storeProducts.find(sp => sp.store_id === store.store_id && sp.product_id === productId);
-    if (sp) sp.to_show = !currentShow;
-    setRefresh(r => r + 1);
+    const nextShow = !currentShow;
+
+    if (isShopManager) {
+      const sp = storeProducts.find(
+        (sp) => sp.store_id === store.store_id && sp.product_id === productId,
+      );
+
+      if (sp) sp.to_show = !currentShow;
+      setRefresh((r) => r + 1);
+      return;
+    }
+
+    try {
+      await apiToggleProductVisibility(store.store_id, productId, nextShow);
+
+      setTenantProducts((currentProducts) =>
+        currentProducts.map((product) =>
+          String(product.product_id) === String(productId)
+            ? { ...product, to_show: nextShow }
+            : product,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to update product visibility:", error);
+    }
   };
 
   const handleAddProduct = () => {
@@ -36,28 +106,43 @@ export default function ProductsView({ stores }) {
       to_show: false,
     });
     setShowAdd(false);
-    setNewProduct({ product_name: '', category: 'Fashion', price: '', imageUrl: '' });
-    setRefresh(r => r + 1);
+    setNewProduct({
+      product_name: "",
+      category: "Fashion",
+      price: "",
+      imageUrl: "",
+    });
+    setRefresh((r) => r + 1);
   };
 
-  if (!store) return <EmptyState title="No stores" message="You don't have any stores yet." />;
+  if (!store)
+    return (
+      <EmptyState title="No stores" message="You don't have any stores yet." />
+    );
 
-  const CATEGORIES = ['Fashion', 'Electronics', 'Home & Decor', 'Beauty'];
+  const CATEGORIES = ["Fashion", "Electronics", "Home & Decor", "Beauty"];
 
   return (
     <div key={refresh}>
       <PageHeader
         title="Products"
         subtitle="Manage your product listings and top-selling flags"
-        action={<button onClick={() => setShowAdd(true)} className="btn-primary text-sm"><Plus size={16} /> Add Product</button>}
+        action={
+          <button
+            onClick={() => setShowAdd(true)}
+            className="btn-primary text-sm"
+          >
+            <Plus size={16} /> Add Product
+          </button>
+        }
       />
       {stores.length > 1 && (
         <div className="flex gap-2 mb-6 flex-wrap">
-          {stores.map(s => (
+          {stores.map((s) => (
             <button
               key={s.store_id}
               onClick={() => setSelectedStore(s.store_id)}
-              className={`px-3 py-1.5 rounded-lg text-sm ${selectedStore === s.store_id ? 'bg-brand-600 text-white' : 'bg-white border border-slate-300 text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg text-sm ${selectedStore === s.store_id ? "bg-brand-600 text-white" : "bg-white border border-slate-300 text-slate-600"}`}
             >
               {s.store_name}
             </button>
@@ -73,50 +158,107 @@ export default function ProductsView({ stores }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {storeProductList.map(product => (
+        {storeProductList.map((product) => (
           <div key={product.product_id} className="card overflow-hidden">
             <div className="relative h-32 overflow-hidden bg-slate-100">
-              <img src={product.imageUrl} alt={product.product_name} className="w-full h-full object-cover" />
+              <img
+                src={product.imageUrl}
+                alt={product.product_name}
+                className="w-full h-full object-cover"
+              />
               <button
-                onClick={() => handleToggle(product.product_id, product.to_show)}
-                className={`absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center ${product.to_show ? 'bg-amber-500 text-white' : 'bg-white/80 text-slate-400'}`}
+                onClick={() =>
+                  handleToggle(product.product_id, product.to_show)
+                }
+                className={`absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center ${product.to_show ? "bg-amber-500 text-white" : "bg-white/80 text-slate-400"}`}
               >
-                {product.to_show ? <Star size={14} fill="currentColor" /> : <Star size={14} />}
+                {product.to_show ? (
+                  <Star size={14} fill="currentColor" />
+                ) : (
+                  <Star size={14} />
+                )}
               </button>
             </div>
             <div className="p-3">
               <p className="text-xs text-slate-400">{product.category}</p>
-              <h3 className="font-medium text-slate-800 text-sm">{product.product_name}</h3>
+              <h3 className="font-medium text-slate-800 text-sm">
+                {product.product_name}
+              </h3>
               <div className="flex items-center justify-between">
-                <p className="font-semibold text-brand-600 text-sm">${product.price.toFixed(2)}</p>
-                {product.to_show ? <Badge variant="warning">Top Selling</Badge> : <Badge variant="neutral">Hidden</Badge>}
+                <p className="font-semibold text-brand-600 text-sm">
+                  ${product.price.toFixed(2)}
+                </p>
+                {product.to_show ? (
+                  <Badge variant="warning">Top Selling</Badge>
+                ) : (
+                  <Badge variant="neutral">Hidden</Badge>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Product" size="md">
+      <Modal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Add Product"
+        size="md"
+      >
         <div className="space-y-4">
           <div>
             <label className="label">Product Name</label>
-            <input className="input" value={newProduct.product_name} onChange={e => setNewProduct({ ...newProduct, product_name: e.target.value })} placeholder="e.g. Cotton Shirt" />
+            <input
+              className="input"
+              value={newProduct.product_name}
+              onChange={(e) =>
+                setNewProduct({ ...newProduct, product_name: e.target.value })
+              }
+              placeholder="e.g. Cotton Shirt"
+            />
           </div>
           <div>
             <label className="label">Category</label>
-            <select className="input" value={newProduct.category} onChange={e => setNewProduct({ ...newProduct, category: e.target.value })}>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            <select
+              className="input"
+              value={newProduct.category}
+              onChange={(e) =>
+                setNewProduct({ ...newProduct, category: e.target.value })
+              }
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
           </div>
           <div>
             <label className="label">Price ($)</label>
-            <input type="number" className="input" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} placeholder="e.g. 49.99" />
+            <input
+              type="number"
+              className="input"
+              value={newProduct.price}
+              onChange={(e) =>
+                setNewProduct({ ...newProduct, price: e.target.value })
+              }
+              placeholder="e.g. 49.99"
+            />
           </div>
           <div>
             <label className="label">Image URL (optional)</label>
-            <input className="input" value={newProduct.imageUrl} onChange={e => setNewProduct({ ...newProduct, imageUrl: e.target.value })} placeholder="Leave blank for default" />
+            <input
+              className="input"
+              value={newProduct.imageUrl}
+              onChange={(e) =>
+                setNewProduct({ ...newProduct, imageUrl: e.target.value })
+              }
+              placeholder="Leave blank for default"
+            />
           </div>
-          <button onClick={handleAddProduct} className="btn-primary w-full">Add Product</button>
+          <button onClick={handleAddProduct} className="btn-primary w-full">
+            Add Product
+          </button>
         </div>
       </Modal>
     </div>

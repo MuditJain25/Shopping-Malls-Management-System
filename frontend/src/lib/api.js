@@ -163,11 +163,10 @@ export async function apiGetTopSellingProducts(mallId) {
 }
 
 export async function apiToggleProductVisibility(storeId, productId, toShow) {
-  // return apiFetch(`/stores/${storeId}/products/${productId}`, {
-  //   method: 'PUT',
-  //   body: JSON.stringify({ to_show: toShow }),
-  // });
-  return { success: true };
+  return apiFetch(`/stores/${storeId}/products/${productId}`, {
+    method: "PUT",
+    body: JSON.stringify({ to_show: toShow }),
+  });
 }
 
 // ── Bid Events & Bids ──────────────────────────────────────────
