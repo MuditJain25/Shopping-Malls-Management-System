@@ -38,11 +38,11 @@ public class StoreController {
         return Paging.shape(stores.productsByStore(id, p), page);
     }
 
-    @PostMapping("/{id}/products")
+    @PostMapping("/{id}/products/{productId}")
     @ResponseStatus(HttpStatus.CREATED)
-    public Object addProduct(@PathVariable Integer id,
-                             @Valid @RequestBody MallDtos.ProductCreateRequest req) {
-        return stores.addProduct(id, req);
+    public Object attachProduct(@PathVariable Integer id, @PathVariable Integer productId,
+                                @RequestBody(required = false) MallDtos.VisibilityRequest req) {
+        return stores.attachProduct(id, productId, req == null ? null : req.toShow());
     }
 
     @PutMapping("/{id}/products/{pid}")

@@ -40,7 +40,7 @@
 ## 1. Goals / Non-goals
 
 **Goals:**
-- 1:1 server coverage for every `api*.js` function + the 5 missing mutations the UI performs by direct array push/splice (`POST /stores/{id}/products`, `POST /tenants`, `DELETE /tenants/{id}`, `DELETE /employees/{id}`, `PATCH /employees/{id}/leave-requests/{rid}`).
+- 1:1 server coverage for every `api*.js` function + the 5 missing mutations the UI performs by direct array push/splice (`POST /products` + `POST /stores/{id}/products/{pid}`, `POST /tenants`, `DELETE /tenants/{id}`, `DELETE /employees/{id}`, `PATCH /employees/{id}/leave-requests/{rid}`).
 - Google-login auth with role derivation, no passwords.
 - Minimal schema deltas, all listed in §6, none applied to `mall_schema.sql` itself.
 - `snake_case` JSON matching mock keys so future frontend switch is mechanical.
@@ -155,9 +155,11 @@ backend/
       OverseesRepository, BidEventRepository, BidRepository, TransactionRepository,
       UserRepository, OfferRepository, RevenueRepository
     service/ (+ impl/ — one impl per interface)
-      AuthService, MallService, StoreService, ProductService, BidService, BidEventService,
+      AuthService, MallService, StoreService, BidService, BidEventService,
       TenantService, EmployeeService, AttendanceService, LeaveService,
       ManagerService, ExecutiveService, OfferService, TransactionService
+      (no ProductService: catalog CRUD sits in ProductController against
+       ProductRepository — only store-scoped product rules need a service)
     exception/
       GlobalExceptionHandler.java (404/400/409/422 → ApiError)
       ResourceNotFoundException, BadRequestException, ConflictException
@@ -326,7 +328,7 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
 
 ## 9. API contract (base `/api`)
 
-Pagination: every `GET` list supports `?page=&size=&sort=` (see §11). Write `201` returns created body; `DELETE` returns `204`.
+Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **except `GET /products`**, which returns the whole catalog as a plain array. Write `201` returns created body; `DELETE` returns `204`.
 
 | Method | Path | Req body | Resp | Roles | Notes / mock source |
 |---|---|---|---|---|---|
@@ -343,15 +345,17 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11). Write `20
 | GET | `/malls/{id}/offers` | — | `Offer[]` | permit | via mall's stores |
 | GET | `/stores/available` | `?mallId=` | `Store[]` | permit | |
 | GET | `/stores/{id}` | — | `Store` | permit | |
-| GET | `/stores/{id}/products` | — | `Product[]` | auth | includes `to_show` |
-| POST | `/stores/{id}/products` | ProductCreate | `Product 201` | tenant,shop_manager | **added** (`ProductsView.jsx:24`) |
-| PUT | `/stores/{id}/products/{pid}` | `{to_show}` | `{success:true}` | tenant,shop_manager | star toggle |
+| GET | `/stores/{id}/products` | `?page…` | `Product[]` | auth | includes `to_show` |
+| POST | `/stores/{id}/products/{pid}` | `{to_show}` | `Product 201` | auth | links an **existing** catalog product; `409` if already linked |
+| PUT | `/stores/{id}/products/{pid}` | `{to_show}` | `{success:true}` | auth | star toggle |
 | GET | `/stores/{id}/employees` | — | `Employee[]` | tenant,mall_manager | |
 | GET | `/stores/{id}/offers` | — | `Offer[]` | permit | |
 | POST | `/stores/{id}/offers` | OfferCreate | `Offer 201` | tenant,mall_manager | |
 | PUT | `/stores/{id}/offers/{oid}` | OfferCreate | `Offer` | tenant,mall_manager | full CRUD confirmed v2.1 |
 | DELETE | `/stores/{id}/offers/{oid}` | — | `204` | tenant,mall_manager | full CRUD confirmed v2.1 |
+| GET | `/products` | `?search=` | `Product[]` | permit | catalog, **no paging**; `search` matches `product_name` OR `category` |
 | GET | `/products/{id}` | — | `Product` | permit | optional |
+| POST | `/products` | ProductCreate | `Product 201` | auth | catalog entry only, **no** store link; `product_id` is the key, names may repeat |
 | GET | `/bid-events` | `?mallId=&status=` | `BidEvent[]` | permit | |
 | GET | `/bid-events/{id}` | — | `BidEvent` | permit | |
 | GET | `/bid-events/{id}/bids` | — | `Bid[]` | permit | |

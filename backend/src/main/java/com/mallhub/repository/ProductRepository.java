@@ -9,6 +9,17 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Integer> {
 
+    List<Product> findAllByOrderByProductNameAsc();
+
+    /** Catalog search: matches product name OR category, case-insensitive. */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE LOWER(p.productName) LIKE LOWER(CONCAT('%', :q, '%'))
+               OR LOWER(p.category) LIKE LOWER(CONCAT('%', :q, '%'))
+            ORDER BY p.productName
+            """)
+    List<Product> search(@Param("q") String q);
+
     // (product, store) pairs already filtered by mall and toShow = true.
     @Query("""
             SELECT p, s FROM StoreProduct sp

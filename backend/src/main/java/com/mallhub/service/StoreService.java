@@ -77,17 +77,18 @@ public class StoreService {
     }
 
     @Transactional
-    public MallDtos.ProductResponse addProduct(Integer storeId, MallDtos.ProductCreateRequest req) {
+    public MallDtos.ProductResponse attachProduct(Integer storeId, Integer productId, Boolean toShow) {
         require(storeId);
-        var p = new com.mallhub.entity.Product();
-        p.setProductName(req.productName());
-        p.setCategory(req.category());
-        p.setPrice(req.price());
-        p.setImageUrl(req.imageUrl());
-        p = products.save(p);
-        links.save(new StoreProduct(storeId, p.getProductId(), false));
+        var p = products.findById(productId).orElseThrow(() -> ApiException.notFound("Product"));
+        // (store_id, product_id) is the composite PK; check first so the caller gets a
+        // readable 409 instead of a raw duplicate-key SQL error.
+        if (links.existsById(new StoreProduct.Id(storeId, productId))) {
+            throw ApiException.conflict(
+                    "Product " + productId + " is already linked to store " + storeId);
+        }
+        var link = links.save(new StoreProduct(storeId, productId, toShow != null && toShow));
         return new MallDtos.ProductResponse(p.getProductId(), p.getProductName(),
-                p.getCategory(), p.getPrice(), p.getImageUrl(), false, null);
+                p.getCategory(), p.getPrice(), p.getImageUrl(), link.getToShow(), null);
     }
 
     @Transactional
