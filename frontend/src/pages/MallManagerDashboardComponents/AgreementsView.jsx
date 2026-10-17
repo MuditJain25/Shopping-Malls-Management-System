@@ -1,11 +1,26 @@
-import { PageHeader, DataTable, Badge } from '@/components/ui/index.jsx';
-import { tenants, transactions, getMallById, getStoresByMall, revenueInfo } from '@/lib/mockData.js';
+import { useState, useEffect } from 'react';
+import { PageHeader, DataTable, Badge, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
+import { apiGetTenants, apiGetTransactionsByMall } from '@/lib/api.js';
 
 export default function AgreementsView({ mallId }) {
-  const mallStores = getStoresByMall(mallId).filter(s => s.status === 'occupied');
-  const mallTenants = tenants.filter(t => t.store_ids.some(sid => mallStores.some(s => s.store_id === sid)));
-  const mallName = getMallById(mallId)?.city === 'New York' ? 'Heritage Plaza Mall' : getMallById(mallId)?.city === 'San Jose' ? 'Tech Park Mall' : 'Lakeshore Mall';
-  const mallTransactions = transactions.filter(t => t.receiver === mallName);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    Promise.all([apiGetTenants(mallId), apiGetTransactionsByMall(mallId)])
+      .then(([mallTenants, mallTransactions]) => {
+        if (!cancelled) setData({ mallTenants, mallTransactions });
+      })
+      .catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [mallId]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingSpinner label="Loading agreements..." />;
+
+  const { mallTenants, mallTransactions } = data;
 
   return (
     <div>
@@ -27,7 +42,7 @@ export default function AgreementsView({ mallId }) {
       </div>
 
       <h3 className="font-semibold text-slate-900 mb-3">Transaction History</h3>
-      <div className="card overflow-hidden mb-8">
+      <div className="card overflow-hidden">
         <DataTable
           columns={[
             { key: 'sender', label: 'From', render: t => <span className="font-medium text-slate-800">{t.sender}</span> },
@@ -37,20 +52,6 @@ export default function AgreementsView({ mallId }) {
           ]}
           rows={mallTransactions}
           emptyMessage="No transactions recorded."
-        />
-      </div>
-
-      <h3 className="font-semibold text-slate-900 mb-3">Tenant Revenue Submissions</h3>
-      <div className="card overflow-hidden">
-        <DataTable
-          columns={[
-            { key: 'tenant', label: 'Tenant', render: r => { const t = tenants.find(t => t.tenant_id === r.tenant_id); return <span className="font-medium text-slate-800">{t?.business_name || r.tenant_id}</span>; } },
-            { key: 'month', label: 'Month', render: r => <span className="text-slate-600">{r.month}</span> },
-            { key: 'amount', label: 'Revenue', render: r => <span className="font-semibold text-slate-900">${r.amount.toLocaleString()}</span> },
-            { key: 'submitted_date', label: 'Submitted', render: r => <span className="text-slate-500">{r.submitted_date}</span> },
-          ]}
-          rows={revenueInfo.filter(r => mallTenants.some(t => t.tenant_id === r.tenant_id))}
-          emptyMessage="No revenue reports submitted."
         />
       </div>
     </div>

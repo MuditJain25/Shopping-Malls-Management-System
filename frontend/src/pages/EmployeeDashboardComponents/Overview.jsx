@@ -1,31 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-// 2. Icons (Assuming you are using 'lucide-react' based on the prop signature and names)
-import { 
-  DollarSign, 
-  Calendar, 
-  FileText, 
-  Briefcase, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle, 
-  LogIn, 
-  LogOut 
+import {
+  DollarSign,
+  Calendar,
+  FileText,
+  Briefcase,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 
-import { PageHeader, StatCard, DataTable, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
+import { PageHeader, StatCard, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import {
-  getEmployeeById, getLeaveRequestsByEmployee, getPayrollByEmployee,
-  getAttendanceByEmployee, employees, getStoreById, getMallById,
-  attendanceRecords, leaveRequests
-} from '@/lib/mockData.js';
+  apiGetEmployeeById, apiGetLeaveRequests, apiGetPayroll,
+  apiGetAttendance, apiCheckIn, apiCheckOut
+} from '@/lib/api.js';
 
 export default function Overview({ empId, user }) {
-  const employee = getEmployeeById(empId);
-  const leaveReqs = getLeaveRequestsByEmployee(empId);
-  const payroll = getPayrollByEmployee(empId);
-  const attendance = getAttendanceByEmployee(empId);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [refresh, setRefresh] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    Promise.all([
+      apiGetEmployeeById(empId),
+      apiGetLeaveRequests(empId),
+      apiGetPayroll(empId),
+      apiGetAttendance(empId),
+    ])
+      .then(([employee, leaveReqs, payroll, attendance]) => {
+        if (!cancelled) setData({ employee, leaveReqs, payroll, attendance });
+      })
+      .catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [empId, refresh]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingSpinner label="Loading dashboard..." />;
+
+  const { employee, leaveReqs, payroll, attendance } = data;
   const today = new Date().toISOString().split('T')[0];
   const todayRecord = attendance.find(a => a.date === today);
   const pendingLeaves = leaveReqs.filter(l => l.status === 'pending').length;
@@ -61,8 +79,8 @@ export default function Overview({ empId, user }) {
             </div>
           </div>
           <div className="flex gap-2">
-            {!todayRecord?.check_in_time && <CheckInButton empId={empId} />}
-            {todayRecord?.check_in_time && !todayRecord?.check_out_time && <CheckOutButton empId={empId} />}
+            {!todayRecord?.check_in_time && <CheckInButton empId={empId} onDone={() => setRefresh(r => r + 1)} />}
+            {todayRecord?.check_in_time && !todayRecord?.check_out_time && <CheckOutButton empId={empId} onDone={() => setRefresh(r => r + 1)} />}
             {todayRecord?.check_in_time && todayRecord?.check_out_time && <Badge variant="success">Complete</Badge>}
           </div>
         </div>
@@ -109,34 +127,48 @@ function LeaveBadge({ status }) {
   return <Badge variant="warning"><AlertCircle size={12} /> Pending</Badge>;
 }
 
-function CheckInButton({ empId }) {
+function CheckInButton({ empId, onDone }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const handle = async () => {
     setLoading(true);
-    // REAL API: await apiCheckIn(empId);
-    const today = new Date().toISOString().split('T')[0];
-    const time = new Date().toTimeString().slice(0, 5);
-    const existing = attendanceRecords.find(a => a.e_id === empId && a.date === today);
-    if (existing) existing.check_in_time = time;
-    else attendanceRecords.push({ e_id: empId, date: today, check_in_time: time, check_out_time: null });
-    setLoading(false);
-    window.location.reload();
+    setError(null);
+    try {
+      await apiCheckIn(empId);
+      onDone();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
-  return <button onClick={handle} disabled={loading} className="btn-primary text-sm"><LogIn size={16} /> {loading ? '...' : 'Check In'}</button>;
+  return (
+    <>
+      <button onClick={handle} disabled={loading} className="btn-primary text-sm"><LogIn size={16} /> {loading ? '...' : 'Check In'}</button>
+      {error && <span className="text-xs text-red-500 self-center">{error}</span>}
+    </>
+  );
 }
 
-function CheckOutButton({ empId }) {
+function CheckOutButton({ empId, onDone }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const handle = async () => {
     setLoading(true);
-    // REAL API: await apiCheckOut(empId);
-    const today = new Date().toISOString().split('T')[0];
-    const time = new Date().toTimeString().slice(0, 5);
-    const existing = attendanceRecords.find(a => a.e_id === empId && a.date === today);
-    if (existing) existing.check_out_time = time;
-    setLoading(false);
-    window.location.reload();
+    setError(null);
+    try {
+      await apiCheckOut(empId);
+      onDone();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
-  return <button onClick={handle} disabled={loading} className="btn-secondary text-sm"><LogOut size={16} /> {loading ? '...' : 'Check Out'}</button>;
+  return (
+    <>
+      <button onClick={handle} disabled={loading} className="btn-secondary text-sm"><LogOut size={16} /> {loading ? '...' : 'Check Out'}</button>
+      {error && <span className="text-xs text-red-500 self-center">{error}</span>}
+    </>
+  );
 }
-

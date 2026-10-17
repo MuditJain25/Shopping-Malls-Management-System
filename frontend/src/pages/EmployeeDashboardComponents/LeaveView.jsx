@@ -1,40 +1,48 @@
-import { useState } from "react";
-import { Plus, CheckCircle2 } from "lucide-react";
-import {PageHeader,DataTable,Badge} from '@/components/ui/index.jsx'
+import { useState, useEffect } from "react";
+import { Plus, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { PageHeader, DataTable, Badge, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import Modal from '@/components/ui/Modal.jsx';
 
-import {
-  getEmployeeById, getLeaveRequestsByEmployee, getPayrollByEmployee,
-  getAttendanceByEmployee, employees, getStoreById, getMallById,
-  attendanceRecords, leaveRequests
-} from '@/lib/mockData.js';
-import {
-  apiGetEmployeeById, apiGetLeaveRequests, apiApplyLeave,
-  apiGetPayroll, apiGetAttendance, apiCheckIn, apiCheckOut
-} from '@/lib/api.js';
+import { apiGetLeaveRequests, apiApplyLeave } from '@/lib/api.js';
 
 export default function LeaveView({ empId }) {
+  const [leaveReqs, setLeaveReqs] = useState(null);
+  const [error, setError] = useState(null);
+  const [refresh, setRefresh] = useState(0);
   const [showApply, setShowApply] = useState(false);
   const [newLeave, setNewLeave] = useState({ start_date: '', end_date: '', reason: '' });
-  const [refresh, setRefresh] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [applyError, setApplyError] = useState(null);
 
-  const leaveReqs = getLeaveRequestsByEmployee(empId);
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    apiGetLeaveRequests(empId)
+      .then(data => { if (!cancelled) setLeaveReqs(data); })
+      .catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [empId, refresh]);
 
   const handleApply = async () => {
-    // REAL API: await apiApplyLeave(empId, newLeave);
-    leaveRequests.push({
-      e_id: empId,
-      request_id: `lr${Date.now()}`,
-      ...newLeave,
-      status: 'pending',
-    });
-    setShowApply(false);
-    setNewLeave({ start_date: '', end_date: '', reason: '' });
-    setRefresh(r => r + 1);
+    setSaving(true);
+    setApplyError(null);
+    try {
+      await apiApplyLeave(empId, newLeave);
+      setShowApply(false);
+      setNewLeave({ start_date: '', end_date: '', reason: '' });
+      setRefresh(r => r + 1);
+    } catch (e) {
+      setApplyError(e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
+  if (error) return <ErrorState message={error} />;
+  if (!leaveReqs) return <LoadingSpinner label="Loading leave requests..." />;
+
   return (
-    <div key={refresh}>
+    <div>
       <PageHeader
         title="Leave Requests"
         subtitle="Apply for and track your leave requests"
@@ -68,7 +76,8 @@ export default function LeaveView({ empId }) {
             <label className="label">Reason</label>
             <textarea className="input min-h-[80px]" value={newLeave.reason} onChange={e => setNewLeave({ ...newLeave, reason: e.target.value })} placeholder="Please provide a reason for your leave request..." />
           </div>
-          <button onClick={handleApply} className="btn-primary w-full">Submit Request</button>
+          {applyError && <ErrorState message={applyError} />}
+          <button onClick={handleApply} disabled={saving} className="btn-primary w-full">{saving ? 'Submitting...' : 'Submit Request'}</button>
         </div>
       </Modal>
     </div>

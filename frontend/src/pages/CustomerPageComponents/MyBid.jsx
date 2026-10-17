@@ -1,39 +1,86 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { Gavel, Trophy, TrendingUp } from 'lucide-react';
+import { PageHeader, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import {
-  MapPin, Building2, Gavel, Star, ArrowRight, ChevronRight,
-  TrendingUp, Trophy, Check, Store
-} from 'lucide-react';
-import { useAuth } from '@/context/AuthContext.jsx';
-import { useRouter } from '@/context/RouterContext.jsx';
-import { PageHeader, StatCard, Badge, EmptyState, LoadingSpinner } from '@/components/ui/index.jsx';
-import {
-  malls, stores, bidEvents, getBidsByEvent, getWinningBid,
-  getMallById, getStoreById, getTopSellingProducts, getStoresByMall,
-  bids
-} from '@/lib/mockData.js';
+  apiGetBidEvents,
+  apiGetBidsByEvent,
+  apiGetMalls,
+  apiGetStoreById,
+} from '@/lib/api.js';
 
 export default function MyBids({ user }) {
-  const [refresh, setRefresh] = useState(0);
-  const userBids = bids.filter(b => b.user_id === user.id);
-  const userBidEvents = userBids.map(b => ({
-    bid: b,
-    event: bidEvents.find(be => be.event_id === b.event_id),
-  })).filter(item => item.event);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+        // No "bids by user" endpoint, so fan out per event and filter client-side.
+        const [events, mallList] = await Promise.all([
+          apiGetBidEvents(),
+          apiGetMalls().catch(() => []),
+        ]);
+        if (cancelled) return;
+        const malls = {};
+        mallList.forEach((m) => { malls[m.mall_id] = m; });
+
+        const bidsPerEvent = await Promise.all(
+          events.map((e) => apiGetBidsByEvent(e.event_id).catch(() => [])),
+        );
+        if (cancelled) return;
+
+        const mine = [];
+        events.forEach((event, i) => {
+          (bidsPerEvent[i] || [])
+            .filter((b) => String(b.user_id) === String(user.id))
+            .forEach((bid) => mine.push({ bid, event }));
+        });
+
+        const storeIds = [...new Set(mine.map(({ event }) => event.store_id))];
+        const storeEntries = await Promise.all(
+          storeIds.map(async (id) => {
+            try {
+              return [id, await apiGetStoreById(id)];
+            } catch {
+              return [id, null];
+            }
+          }),
+        );
+        if (cancelled) return;
+
+        const stores = Object.fromEntries(storeEntries);
+        setItems(mine.map(({ bid, event }) => {
+          const store = stores[event.store_id] || null;
+          return { bid, event, store, mall: store ? malls[store.mall_id] : null };
+        }));
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load your bids');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
+
+  if (loading) return <LoadingSpinner label="Loading your bids..." />;
+  if (error) return <ErrorState message={error} />;
 
   return (
-    <div key={refresh}>
+    <div>
       <PageHeader title="My Bids" subtitle="Track your bidding activity" />
-      {userBidEvents.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyState icon={Gavel} title="No bids placed yet" message="Explore properties and join a bidding event to get started." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {userBidEvents.map(({ bid, event }) => {
-            const store = getStoreById(event.store_id);
-            const mall = store ? getMallById(store.mall_id) : null;
-            const currentWinner = getWinningBid(event.event_id);
+          {items.map(({ bid, event, store, mall }) => {
+            const currentWinner = event.winningBid;
             const isWinning = bid.status === 'winning';
             return (
-              <div key={bid.bid_id} className="card p-4">
+              <div key={`${bid.event_id}-${bid.bid_id}`} className="card p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-slate-900 text-sm">{store?.store_name}</h3>
@@ -44,11 +91,11 @@ export default function MyBids({ user }) {
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="p-2.5 rounded-lg bg-slate-50">
                     <p className="text-xs text-slate-400">Your Bid</p>
-                    <p className="font-semibold text-slate-800 text-sm">${bid.bid_amount.toLocaleString()}</p>
+                    <p className="font-semibold text-slate-800 text-sm">${Number(bid.bid_amount).toLocaleString()}</p>
                   </div>
                   <div className="p-2.5 rounded-lg bg-slate-50">
                     <p className="text-xs text-slate-400">Current Highest</p>
-                    <p className="font-semibold text-green-600 text-sm">${(currentWinner?.bid_amount || 0).toLocaleString()}</p>
+                    <p className="font-semibold text-green-600 text-sm">${Number(currentWinner?.bid_amount || 0).toLocaleString()}</p>
                   </div>
                 </div>
                 {isWinning && (
@@ -65,7 +112,7 @@ export default function MyBids({ user }) {
                 )}
                 {event.status === 'finalized' && (
                   <div className="p-2.5 rounded-lg bg-slate-50 text-sm text-slate-600">
-                    {event.final_allocation || 'Event finalized'}
+                    Event finalized
                   </div>
                 )}
               </div>

@@ -1,23 +1,28 @@
-import { PageHeader, StatCard, DataTable, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
-import {
-  Home, Clock, FileText, Briefcase, User,
-  Calendar, CheckCircle2, XCircle, AlertCircle, DollarSign,
-  LogIn, LogOut, Plus, TrendingUp, Mail, Phone, Building2
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { PageHeader, StatCard, DataTable, Badge, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
+import { Briefcase, DollarSign, TrendingUp } from 'lucide-react';
 
-import {
-  getEmployeeById, getLeaveRequestsByEmployee, getPayrollByEmployee,
-  getAttendanceByEmployee, employees, getStoreById, getMallById,
-  attendanceRecords, leaveRequests
-} from '@/lib/mockData.js';
-import {
-  apiGetEmployeeById, apiGetLeaveRequests, apiApplyLeave,
-  apiGetPayroll, apiGetAttendance, apiCheckIn, apiCheckOut
-} from '@/lib/api.js';
+import { apiGetEmployeeById, apiGetPayroll } from '@/lib/api.js';
 
 export default function SalaryView({ empId }) {
-  const payroll = getPayrollByEmployee(empId);
-  const employee = getEmployeeById(empId);
+  const [payroll, setPayroll] = useState(null);
+  const [employee, setEmployee] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    Promise.all([apiGetPayroll(empId), apiGetEmployeeById(empId)])
+      .then(([pay, emp]) => {
+        if (!cancelled) { setPayroll(pay); setEmployee(emp); }
+      })
+      .catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [empId]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!payroll) return <LoadingSpinner label="Loading salary records..." />;
+
   const totalEarnings = payroll.filter(p => p.record_type !== 'deduction').reduce((s, p) => s + p.amount, 0);
   const totalDeductions = payroll.filter(p => p.record_type === 'deduction').reduce((s, p) => s + p.amount, 0);
 
@@ -25,7 +30,7 @@ export default function SalaryView({ empId }) {
     <div>
       <PageHeader title="Salary Slips" subtitle="Your payroll and earnings history" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <StatCard icon={DollarSign} label="Base Salary" value={`$${employee?.base_salary.toLocaleString() || 0}`} color="brand" />
+        <StatCard icon={DollarSign} label="Base Salary" value={`$${Number(employee?.base_salary ?? 0).toLocaleString()}`} color="brand" />
         <StatCard icon={TrendingUp} label="Total Earnings" value={`$${totalEarnings.toLocaleString()}`} color="success" />
         <StatCard icon={Briefcase} label="Pay Records" value={payroll.length} color="accent" />
       </div>

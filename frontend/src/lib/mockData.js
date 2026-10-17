@@ -976,7 +976,7 @@ export const attendanceRecords = [
 // ΓöÇΓöÇ Demo Users (for mock sign-in) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const demoUsers = [
   {
-    id: "u1",
+    id: "111",
     email: "customer@demo.com",
     password: "demo123",
     role: "customer",
@@ -985,7 +985,7 @@ export const demoUsers = [
     profileId: "u1",
   },
   {
-    id: "u2",
+    id: "222",
     email: "tenant@demo.com",
     password: "demo123",
     role: "tenant",
@@ -994,7 +994,7 @@ export const demoUsers = [
     profileId: 1,
   },
   {
-    id: "u3",
+    id: "333",
     email: "shopmgr@demo.com",
     password: "demo123",
     role: "shop_manager",
@@ -1003,16 +1003,16 @@ export const demoUsers = [
     profileId: "e1",
   },
   {
-    id: "u4",
+    id: "444",
     email: "mallmgr@demo.com",
     password: "demo123",
     role: "mall_manager",
     firstName: "Daniel",
     lastName: "Foster",
-    profileId: "mm1",
+    profileId: 1,
   },
   {
-    id: "u5",
+    id: "555",
     email: "exec@demo.com",
     password: "demo123",
     role: "executive",
@@ -1021,13 +1021,13 @@ export const demoUsers = [
     profileId: "ex1",
   },
   {
-    id: "u6",
+    id: "666",
     email: "employee@demo.com",
     password: "demo123",
     role: "employee",
     firstName: "Sarah",
     lastName: "Johnson",
-    profileId: "e2",
+    profileId: 2,
   },
 ];
 

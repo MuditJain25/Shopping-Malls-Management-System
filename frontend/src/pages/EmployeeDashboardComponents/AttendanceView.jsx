@@ -1,17 +1,32 @@
-import { useState } from "react";
-import { LogIn, LogOut, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import { PageHeader, DataTable, Badge } from '@/components/ui/index.jsx';
+import { useState, useEffect } from "react";
+import { LogIn, LogOut } from "lucide-react";
+import { PageHeader, DataTable, Badge, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 
-import { getAttendanceByEmployee, attendanceRecords } from '@/lib/mockData.js';
+import { apiGetAttendance, apiCheckIn, apiCheckOut } from '@/lib/api.js';
 
 export default function AttendanceView({ empId }) {
-  const records = getAttendanceByEmployee(empId);
+  const [records, setRecords] = useState(null);
+  const [error, setError] = useState(null);
+  const [refresh, setRefresh] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    apiGetAttendance(empId)
+      .then(data => { if (!cancelled) setRecords(data); })
+      .catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [empId, refresh]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!records) return <LoadingSpinner label="Loading attendance..." />;
+
   return (
     <div>
       <PageHeader title="Attendance" subtitle="Your attendance history" />
       <div className="flex gap-2 mb-6">
-        <CheckInButton empId={empId} />
-        <CheckOutButton empId={empId} />
+        <CheckInButton empId={empId} onDone={() => setRefresh(r => r + 1)} />
+        <CheckOutButton empId={empId} onDone={() => setRefresh(r => r + 1)} />
       </div>
       <div className="card overflow-hidden">
         <DataTable
@@ -36,40 +51,48 @@ export default function AttendanceView({ empId }) {
   );
 }
 
-
-function LeaveBadge({ status }) {
-  if (status === 'approved') return <Badge variant="success"><CheckCircle2 size={12} /> Approved</Badge>;
-  if (status === 'rejected') return <Badge variant="error"><XCircle size={12} /> Rejected</Badge>;
-  return <Badge variant="warning"><AlertCircle size={12} /> Pending</Badge>;
-}
-
-function CheckInButton({ empId }) {
+function CheckInButton({ empId, onDone }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const handle = async () => {
     setLoading(true);
-    // REAL API: await apiCheckIn(empId);
-    const today = new Date().toISOString().split('T')[0];
-    const time = new Date().toTimeString().slice(0, 5);
-    const existing = attendanceRecords.find(a => a.e_id === empId && a.date === today);
-    if (existing) existing.check_in_time = time;
-    else attendanceRecords.push({ e_id: empId, date: today, check_in_time: time, check_out_time: null });
-    setLoading(false);
-    window.location.reload();
+    setError(null);
+    try {
+      await apiCheckIn(empId);
+      onDone();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
-  return <button onClick={handle} disabled={loading} className="btn-primary text-sm"><LogIn size={16} /> {loading ? '...' : 'Check In'}</button>;
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={handle} disabled={loading} className="btn-primary text-sm"><LogIn size={16} /> {loading ? '...' : 'Check In'}</button>
+      {error && <span className="text-xs text-red-500">{error}</span>}
+    </div>
+  );
 }
 
-function CheckOutButton({ empId }) {
+function CheckOutButton({ empId, onDone }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const handle = async () => {
     setLoading(true);
-    // REAL API: await apiCheckOut(empId);
-    const today = new Date().toISOString().split('T')[0];
-    const time = new Date().toTimeString().slice(0, 5);
-    const existing = attendanceRecords.find(a => a.e_id === empId && a.date === today);
-    if (existing) existing.check_out_time = time;
-    setLoading(false);
-    window.location.reload();
+    setError(null);
+    try {
+      await apiCheckOut(empId);
+      onDone();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
-  return <button onClick={handle} disabled={loading} className="btn-secondary text-sm"><LogOut size={16} /> {loading ? '...' : 'Check Out'}</button>;
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={handle} disabled={loading} className="btn-secondary text-sm"><LogOut size={16} /> {loading ? '...' : 'Check Out'}</button>
+      {error && <span className="text-xs text-red-500">{error}</span>}
+    </div>
+  );
 }

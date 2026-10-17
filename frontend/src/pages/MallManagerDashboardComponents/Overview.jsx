@@ -1,19 +1,43 @@
+import { useState, useEffect } from 'react';
 import { Store, Users, Gavel, Building2 } from 'lucide-react';
-import { PageHeader, StatCard, Badge, EmptyState } from '@/components/ui/index.jsx';
+import { PageHeader, StatCard, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import {
-  tenants,
-  getMallById, getStoresByMall, getEmployeesByMall,
-  getBidEventsByMall, getBidsByEvent, getWinningBid, getStoreById
-} from '@/lib/mockData.js';
+  apiGetMallById, apiGetStoresByMall, apiGetEmployeesByMall,
+  apiGetBidEventsByMall, apiGetTenants
+} from '@/lib/api.js';
+
+function mallDisplayName(city) {
+  return city === 'New York' ? 'Heritage Plaza' : city === 'San Jose' ? 'Tech Park Mall' : 'Lakeshore Mall';
+}
 
 export default function Overview({ mallId, manager }) {
-  const mall = getMallById(mallId);
-  const mallStores = getStoresByMall(mallId);
-  const mallEmps = getEmployeesByMall(mallId);
-  const events = getBidEventsByMall(mallId);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    Promise.all([
+      apiGetMallById(mallId),
+      apiGetStoresByMall(mallId),
+      apiGetEmployeesByMall(mallId),
+      apiGetBidEventsByMall(mallId),
+      apiGetTenants(mallId),
+    ])
+      .then(([mall, mallStores, mallEmps, events, mallTenants]) => {
+        if (!cancelled) setData({ mall, mallStores, mallEmps, events, mallTenants });
+      })
+      .catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [mallId]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingSpinner label="Loading overview..." />;
+
+  const { mall, mallStores, mallEmps, events, mallTenants } = data;
   const openEvents = events.filter(e => e.status === 'open');
-  const mallTenants = tenants.filter(t => t.store_ids.some(sid => mallStores.some(s => s.store_id === sid)));
-  const mallName = mall?.city === 'New York' ? 'Heritage Plaza' : mall?.city === 'San Jose' ? 'Tech Park Mall' : 'Lakeshore Mall';
+  const mallName = mallDisplayName(mall?.city);
+  const storeName = (storeId) => mallStores.find(s => s.store_id === storeId)?.store_name;
 
   return (
     <div>
@@ -44,12 +68,11 @@ export default function Overview({ mallId, manager }) {
           <h3 className="font-semibold text-slate-900 text-sm mb-3">Bid Events</h3>
           <div className="space-y-2">
             {events.length === 0 ? <EmptyState title="No bid events" /> : events.map(ev => {
-              const store = getStoreById(ev.store_id);
-              const winning = getWinningBid(ev.event_id);
+              const winning = ev.winningBid;
               return (
                 <div key={ev.event_id} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
                   <div>
-                    <p className="text-sm font-medium text-slate-800">{store?.store_name}</p>
+                    <p className="text-sm font-medium text-slate-800">{storeName(ev.store_id)}</p>
                     <p className="text-xs text-slate-400">Ends {ev.end_date}</p>
                   </div>
                   <div className="text-right">

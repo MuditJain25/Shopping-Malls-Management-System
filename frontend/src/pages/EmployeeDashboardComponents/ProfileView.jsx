@@ -1,22 +1,44 @@
-import React from "react";
-import {PageHeader} from '@/components/ui/index.jsx'
+import { useState, useEffect } from "react";
+import { PageHeader, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import {
-  Home, Clock, FileText, Briefcase, User,
-  Calendar, CheckCircle2, XCircle, AlertCircle, DollarSign,
-  LogIn, LogOut, Plus, TrendingUp, Mail, Phone, Building2
+  User,
+  Calendar, Briefcase, DollarSign, Mail, Phone, Building2
 } from 'lucide-react';
-import {
-  getEmployeeById, getLeaveRequestsByEmployee, getPayrollByEmployee,
-  getAttendanceByEmployee, employees, getStoreById, getMallById,
-  attendanceRecords, leaveRequests
-} from '@/lib/mockData.js';
-import {
-  apiGetEmployeeById, apiGetLeaveRequests, apiApplyLeave,
-  apiGetPayroll, apiGetAttendance, apiCheckIn, apiCheckOut
-} from '@/lib/api.js';
+import { apiGetEmployeeById, apiGetStoreById, apiGetMallById } from '@/lib/api.js';
 
 export default function ProfileView({ empId, user }) {
-  const employee = getEmployeeById(empId);
+  const [employee, setEmployee] = useState(null);
+  const [storeName, setStoreName] = useState(null);
+  const [mallName, setMallName] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    setLoaded(false);
+    (async () => {
+      try {
+        const emp = await apiGetEmployeeById(empId);
+        if (cancelled) return;
+        setEmployee(emp);
+        const [store, mall] = await Promise.all([
+          emp?.store_id ? apiGetStoreById(emp.store_id) : Promise.resolve(null),
+          emp?.mall_id ? apiGetMallById(emp.mall_id) : Promise.resolve(null),
+        ]);
+        if (cancelled) return;
+        setStoreName(store?.store_name ?? null);
+        setMallName(mall ? `${mall.city}, ${mall.state}` : null);
+        setLoaded(true);
+      } catch (e) {
+        if (!cancelled) setError(e.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [empId]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!loaded) return <LoadingSpinner label="Loading profile..." />;
   if (!employee) return <EmptyState title="Profile not found" />;
 
   return (
@@ -45,8 +67,8 @@ export default function ProfileView({ empId, user }) {
           <h3 className="font-semibold text-slate-900 text-sm mb-3">Employment Details</h3>
           <div className="space-y-2">
             <ProfileRow icon={User} label="Employee ID" value={employee.employee_id} />
-            <ProfileRow icon={Building2} label="Store" value={employee.store_id ? getStoreName(employee.store_id) : 'Direct Mall Hire'} />
-            <ProfileRow icon={Building2} label="Mall" value={getMallName(employee.mall_id)} />
+            <ProfileRow icon={Building2} label="Store" value={employee.store_id ? (storeName ?? employee.store_id) : 'Direct Mall Hire'} />
+            <ProfileRow icon={Building2} label="Mall" value={mallName ?? employee.mall_id} />
           </div>
         </div>
       </div>
@@ -64,14 +86,4 @@ function ProfileRow({ icon: Icon, label, value }) {
       </div>
     </div>
   );
-}
-
-function getStoreName(storeId) {
-  const s = getStoreById(storeId);
-  return s ? s.store_name : storeId;
-}
-
-function getMallName(mallId) {
-  const m = getMallById(mallId);
-  return m ? `${m.city}, ${m.state}` : mallId;
 }

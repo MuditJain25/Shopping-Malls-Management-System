@@ -1,41 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { PageHeader, DataTable, Badge } from '@/components/ui/index.jsx';
+import { PageHeader, DataTable, Badge, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import Modal from '@/components/ui/Modal.jsx';
-import { getEmployeesByMall, employees, getStoreById } from '@/lib/mockData.js';
+import { apiGetEmployeesByMall, apiGetStoresByMall, apiAddEmployee, apiDeleteEmployee } from '@/lib/api.js';
 
 export default function EmployeesView({ mallId }) {
+  const [employees, setEmployees] = useState(null);
+  const [stores, setStores] = useState([]);
+  const [error, setError] = useState(null);
+  const [refresh, setRefresh] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
   const [newEmp, setNewEmp] = useState({ first_name: '', last_name: '', email: '', base_salary: '', current_designation: '', phone_number: '' });
-  const [refresh, setRefresh] = useState(0);
+  const [actionError, setActionError] = useState(null);
   const [empToRemove, setEmpToRemove] = useState(null);
 
-  const mallEmps = getEmployeesByMall(mallId);
-  const directEmps = mallEmps.filter(e => e.store_id === null);
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    Promise.all([apiGetEmployeesByMall(mallId), apiGetStoresByMall(mallId)])
+      .then(([emps, mallStores]) => {
+        if (!cancelled) { setEmployees(emps); setStores(mallStores); }
+      })
+      .catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [mallId, refresh]);
+
+  const storeName = (storeId) => stores.find(s => s.store_id === storeId)?.store_name || '—';
 
   const handleAdd = async () => {
-    employees.push({
-      ...newEmp,
-      employee_id: `e${Date.now()}`,
-      store_id: null,
-      mall_id: mallId,
-      date_of_joining: new Date().toISOString().split('T')[0],
-      base_salary: parseFloat(newEmp.base_salary) || 0,
-    });
-    setShowAdd(false);
-    setNewEmp({ first_name: '', last_name: '', email: '', base_salary: '', current_designation: '', phone_number: '' });
-    setRefresh(r => r + 1);
+    setActionError(null);
+    try {
+      await apiAddEmployee({
+        ...newEmp,
+        base_salary: parseFloat(newEmp.base_salary) || 0,
+        store_id: null,
+        mall_id: mallId,
+      });
+      setShowAdd(false);
+      setNewEmp({ first_name: '', last_name: '', email: '', base_salary: '', current_designation: '', phone_number: '' });
+      setRefresh(r => r + 1);
+    } catch (e) {
+      setActionError(e.message);
+    }
   };
 
-  const handleRemove = () => {
-    const index = employees.findIndex(e => e.employee_id === empToRemove.employee_id);
-    if (index >= 0) employees.splice(index, 1);
-    setEmpToRemove(null);
-    setRefresh(r => r + 1);
+  const handleRemove = async () => {
+    setActionError(null);
+    try {
+      await apiDeleteEmployee(empToRemove.employee_id);
+      setEmpToRemove(null);
+      setRefresh(r => r + 1);
+    } catch (e) {
+      setActionError(e.message);
+      setEmpToRemove(null);
+    }
   };
+
+  if (error) return <ErrorState message={error} />;
+  if (!employees) return <LoadingSpinner label="Loading employees..." />;
+
+  const directEmps = employees.filter(e => e.store_id === null);
 
   return (
-    <div key={refresh}>
+    <div>
       <PageHeader
         title="Employee Management"
         subtitle="Direct mall employees and store staff"
@@ -63,13 +90,13 @@ export default function EmployeesView({ mallId }) {
         <DataTable
           columns={[
             { key: 'name', label: 'Name', render: e => <span className="font-medium text-slate-800">{e.first_name} {e.last_name}</span> },
-            { key: 'store', label: 'Store', render: e => { const s = getStoreById(e.store_id); return <span className="text-slate-600">{s?.store_name || '—'}</span>; } },
+            { key: 'store', label: 'Store', render: e => <span className="text-slate-600">{storeName(e.store_id)}</span> },
             { key: 'designation', label: 'Designation', render: e => <Badge variant="neutral">{e.current_designation}</Badge> },
             { key: 'email', label: 'Email', render: e => <span className="text-slate-600">{e.email}</span> },
             { key: 'salary', label: 'Salary', render: e => <span className="font-medium text-slate-800">${e.base_salary.toLocaleString()}</span> },
             { key: 'actions', label: '', render: e => <button onClick={() => setEmpToRemove(e)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50" title="Remove employee"><Trash2 size={14} /></button> },
           ]}
-          rows={mallEmps.filter(e => e.store_id !== null)}
+          rows={employees.filter(e => e.store_id !== null)}
           emptyMessage="No store employees in this mall."
         />
       </div>
@@ -102,6 +129,7 @@ export default function EmployeesView({ mallId }) {
             <label className="label">Base Salary ($)</label>
             <input type="number" className="input" value={newEmp.base_salary} onChange={e => setNewEmp({ ...newEmp, base_salary: e.target.value })} />
           </div>
+          {actionError && <ErrorState message={actionError} />}
           <button onClick={handleAdd} className="btn-primary w-full">Add Employee</button>
         </div>
       </Modal>
@@ -109,6 +137,7 @@ export default function EmployeesView({ mallId }) {
       <Modal open={!!empToRemove} onClose={() => setEmpToRemove(null)} title="Remove Employee" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Remove <span className="font-medium text-slate-800">{empToRemove?.first_name} {empToRemove?.last_name}</span> from this mall?</p>
+          {actionError && <ErrorState message={actionError} />}
           <div className="flex gap-3">
             <button onClick={() => setEmpToRemove(null)} className="btn-secondary flex-1">Cancel</button>
             <button onClick={handleRemove} className="btn bg-red-600 text-white hover:bg-red-700 flex-1 px-4 py-2 text-sm font-semibold rounded-lg">Remove</button>
