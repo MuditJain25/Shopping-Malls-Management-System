@@ -93,7 +93,13 @@ export default function TenantDashboard({ role = "tenant" }) {
     return <ProductsView stores={activeStores} role={role} />;
   }
   if (pageKey === "employees") {
-    return <EmployeesView stores={activeStores} />;
+    return (
+      <EmployeesView
+        stores={activeStores}
+        role={role}
+        profileId={user?.profileId}
+      />
+    );
   }
   if (pageKey === "leave") {
     return <LeaveView stores={activeStores} />;

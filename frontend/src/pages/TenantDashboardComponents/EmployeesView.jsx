@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2, Clock, Calendar, DollarSign } from "lucide-react";
 import {
   PageHeader,
@@ -9,14 +9,23 @@ import {
 import Modal from "@/components/ui/Modal.jsx";
 import PayrollRecords from "./PayrollRecords";
 import {
+  apiAddStoreEmployee,
+  apiDeleteEmployee,
+  apiGetEmployeesByStore,
+} from "@/lib/api";
+import {
   getEmployeesByStore,
   employees,
   attendanceRecords,
 } from "@/lib/mockData.js";
 
-export default function EmployeesView({ stores }) {
+export default function EmployeesView({ stores, role, profileId }) {
+  const isShopManager = role === "shop_manager";
+
   const [showAdd, setShowAdd] = useState(false);
+  const [addError, setAddError] = useState("");
   const [selectedStore, setSelectedStore] = useState(stores[0]?.store_id || "");
+  const [tenantEmployees, setTenantEmployees] = useState([]);
   const [newEmp, setNewEmp] = useState({
     first_name: "",
     last_name: "",
@@ -27,40 +36,124 @@ export default function EmployeesView({ stores }) {
   });
   const [refresh, setRefresh] = useState(0);
   const [empToRemove, setEmpToRemove] = useState(null);
+  const [removeError, setRemoveError] = useState("");
   const [empForDetails, setEmpForDetails] = useState(null);
   const [employeeTab, setEmployeeTab] = useState(null);
 
   const store = stores.find((s) => s.store_id === selectedStore) || stores[0];
-  const emps = store ? getEmployeesByStore(store.store_id) : [];
+  const storeId = store?.store_id;
+  useEffect(() => {
+    if (isShopManager || storeId == null) return;
+
+    let cancelled = false;
+
+    apiGetEmployeesByStore(storeId)
+      .then((data) => {
+        if (!cancelled) {
+          const employeeList = Array.isArray(data)
+            ? data
+            : (data?.content ?? data?.items ?? []);
+
+          setTenantEmployees(employeeList);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load tenant employees:", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isShopManager, storeId]);
+
+  const emps = !store
+    ? []
+    : isShopManager
+      ? getEmployeesByStore(store.store_id)
+      : tenantEmployees;
 
   const handleAdd = async () => {
-    employees.push({
-      ...newEmp,
-      employee_id: `e${Date.now()}`,
-      store_id: store.store_id,
-      mall_id: store.mall_id,
-      date_of_joining: new Date().toISOString().split("T")[0],
-      base_salary: parseFloat(newEmp.base_salary) || 0,
-    });
-    setShowAdd(false);
-    setNewEmp({
-      first_name: "",
-      last_name: "",
-      email: "",
-      base_salary: "",
-      current_designation: "",
-      phone_number: "",
-    });
-    setRefresh((r) => r + 1);
+    if (!store) return;
+
+    setAddError("");
+
+    try {
+      if (isShopManager) {
+        employees.push({
+          ...newEmp,
+          employee_id: `e${Date.now()}`,
+          store_id: store.store_id,
+          mall_id: store.mall_id,
+          date_of_joining: new Date().toISOString().split("T")[0],
+          base_salary: parseFloat(newEmp.base_salary) || 0,
+        });
+
+        setRefresh((r) => r + 1);
+      } else {
+        if (profileId == null) {
+          setAddError("Unable to identify the tenant. Please sign in again.");
+          return;
+        }
+
+        const createdEmployee = await apiAddStoreEmployee(profileId, {
+          ...newEmp,
+          base_salary: parseFloat(newEmp.base_salary) || 0,
+          store_id: store.store_id,
+        });
+
+        setTenantEmployees((currentEmployees) => [
+          ...currentEmployees,
+          createdEmployee,
+        ]);
+      }
+
+      setShowAdd(false);
+      setNewEmp({
+        first_name: "",
+        last_name: "",
+        email: "",
+        base_salary: "",
+        current_designation: "",
+        phone_number: "",
+      });
+    } catch (error) {
+      setAddError(error.message || "Failed to add employee. Please try again");
+    }
   };
 
-  const handleRemove = () => {
-    const idx = employees.findIndex(
-      (e) => e.employee_id === empToRemove.employee_id,
-    );
-    if (idx >= 0) employees.splice(idx, 1);
-    setEmpToRemove(null);
-    setRefresh((r) => r + 1);
+  const handleRemove = async () => {
+    if (!empToRemove) return;
+
+    setRemoveError("");
+
+    try {
+      if (isShopManager) {
+        const idx = employees.findIndex(
+          (e) => e.employee_id === empToRemove.employee_id,
+        );
+
+        if (idx >= 0) employees.splice(idx, 1);
+
+        setRefresh((r) => r + 1);
+      } else {
+        await apiDeleteEmployee(empToRemove.employee_id);
+
+        setTenantEmployees((currentEmployees) =>
+          currentEmployees.filter(
+            (employee) =>
+              String(employee.employee_id) !== String(empToRemove.employee_id),
+          ),
+        );
+      }
+
+      setEmpToRemove(null);
+    } catch (error) {
+      setRemoveError(
+        error.message || "Failed to remove employee. Please Try again.",
+      );
+    }
   };
 
   if (!store)
@@ -175,6 +268,11 @@ export default function EmployeesView({ stores }) {
         size="md"
       >
         <div className="space-y-4">
+          {addError && (
+            <p className="text-sm text-red-600" role="alert">
+              {addError}
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">First Name</label>
@@ -298,6 +396,11 @@ export default function EmployeesView({ stores }) {
         size="sm"
       >
         <div className="space-y-4">
+          {removeError && (
+            <p className="text-sm text-red-600" role="alert">
+              {removeError}
+            </p>
+          )}
           <p className="text-sm text-slate-600">
             Are you sure you want to remove{" "}
             <span className="font-medium text-slate-800">

@@ -165,7 +165,9 @@ function normalizeBidEvent(e) {
     store_id: e.storeId ?? e.store_id,
     status: e.status,
     minimum_bid_amount: toNum(e.minimumBidAmount ?? e.minimum_bid_amount ?? 0),
-    minimum_bid_increment: toNum(e.minimumBidIncrement ?? e.minimum_bid_increment ?? 0),
+    minimum_bid_increment: toNum(
+      e.minimumBidIncrement ?? e.minimum_bid_increment ?? 0,
+    ),
     final_allocation: e.finalAllocation ?? e.final_allocation ?? null,
     winningBid: winning ? normalizeBid(winning) : null,
   };
@@ -297,11 +299,17 @@ export async function apiGetBidsByEvent(eventId) {
 export async function apiPlaceBid(eventId, userId, bidAmount, bidderName) {
   const uid = Number(userId);
   if (!Number.isInteger(uid)) {
-    throw new Error("Sign in with a backend account to bid (demo users have no numeric id)");
+    throw new Error(
+      "Sign in with a backend account to bid (demo users have no numeric id)",
+    );
   }
   const data = await apiFetch(`/bid-events/${eventId}/bids`, {
     method: "POST",
-    body: JSON.stringify({ user_id: uid, bid_amount: bidAmount, bidder_name: bidderName }),
+    body: JSON.stringify({
+      user_id: uid,
+      bid_amount: bidAmount,
+      bidder_name: bidderName,
+    }),
   });
   return normalizeBid(data);
 }
@@ -357,8 +365,16 @@ export async function apiGetEmployeesByStore(storeId) {
   return unwrap(data);
 }
 
-// Backend has no POST /employees route; direct-mall (store-less) employees
-// cannot be created yet (see missing-API report).
+// Creates an employee assigned to a store.
+// Store-less employee creation is not supported by the backend yet.
+export async function apiAddStoreEmployee(tenantId, employeeData) {
+  return apiFetch(`/tenants/${tenantId}/employees`, {
+    method: "POST",
+    body: JSON.stringify(employeeData),
+  });
+}
+
+// Backend does not yet support creating store-less employees.
 export async function apiAddEmployee(employeeData) {
   return apiFetch("/employees", {
     method: "POST",
