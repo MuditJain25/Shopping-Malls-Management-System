@@ -101,7 +101,7 @@ export default function TenantDashboard({ role = "tenant" }) {
       />
     );
   }
-  if (pageKey === "leave") {
+  if (pageKey === "leave" && isShopManager) {
     return <LeaveView stores={activeStores} />;
   }
   if (pageKey === "transactions") {
