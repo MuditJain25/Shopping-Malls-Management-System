@@ -2,6 +2,7 @@ package com.mallhub.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -41,5 +42,15 @@ public final class MallDtos {
     }
 
     public record VisibilityRequest(Boolean toShow) {
+    }
+
+    public record StoreCreateRequest(@NotBlank String storeName, @NotNull Integer mallId,
+                                     String shopNumber, Integer floor, Double areaSqft,
+                                     String status, String listingMedia) {
+    }
+
+    public record StoreUpdateRequest(@NotBlank String storeName, @NotNull Integer mallId,
+                                     String shopNumber, Integer floor, Double areaSqft,
+                                     String status, String listingMedia) {
     }
 }

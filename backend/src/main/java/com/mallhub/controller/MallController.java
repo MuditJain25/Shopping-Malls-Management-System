@@ -36,9 +36,16 @@ public class MallController {
         return Paging.shape(malls.storesByMall(id, Paging.pageable(page, size, "storeId")), page);
     }
 
+    @GetMapping("/nearest")
+    public Object nearest(@RequestParam Double lat, @RequestParam Double lng,
+                          @RequestParam(defaultValue = "5") Integer limit) {
+        return malls.nearest(lat, lng, limit);
+    }
+
     @GetMapping("/{id}/products/top")
-    public Object topProducts(@PathVariable Integer id) {
-        return malls.topProducts(id);
+    public Object topProducts(@PathVariable Integer id,
+                              @RequestParam(required = false) Integer storeId) {
+        return malls.topProducts(id, storeId);
     }
 
     @GetMapping("/{id}/manager")

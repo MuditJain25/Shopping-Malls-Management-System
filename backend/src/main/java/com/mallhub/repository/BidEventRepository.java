@@ -15,6 +15,11 @@ import java.util.Optional;
 public interface BidEventRepository extends JpaRepository<BidEvent, BidEvent.Id> {
     List<BidEvent> findByIdEventId(Integer eventId);
 
+    boolean existsByIdStoreIdAndStatus(Integer storeId, String status);
+
+    @Query("SELECT COALESCE(MAX(e.id.eventId), 0) FROM BidEvent e")
+    Integer findMaxEventId();
+
     @Query("SELECT e FROM BidEvent e WHERE (:status IS NULL OR LOWER(e.status) = LOWER(:status))")
     Page<BidEvent> findByStatus(@Param("status") String status, Pageable pageable);
 

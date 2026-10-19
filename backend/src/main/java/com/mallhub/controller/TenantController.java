@@ -74,4 +74,19 @@ public class TenantController {
         var p = Paging.pageable(page, size, "transactionId");
         return Paging.shape(tenants.transactionsByTenant(id, p), page);
     }
+
+    @GetMapping("/{id}/revenue")
+    public Object revenue(@PathVariable Integer id,
+                          @RequestParam(required = false) Integer page,
+                          @RequestParam(required = false) Integer size) {
+        var p = Paging.pageable(page, size, "id.informationId");
+        return Paging.shape(tenants.revenueByTenant(id, p), page);
+    }
+
+    @PostMapping("/{id}/revenue")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Object submitRevenue(@PathVariable Integer id,
+                                @Valid @RequestBody PeopleDtos.RevenueCreateRequest req) {
+        return tenants.submitRevenue(id, req);
+    }
 }

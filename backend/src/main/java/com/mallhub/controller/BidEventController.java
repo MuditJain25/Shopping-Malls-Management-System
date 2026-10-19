@@ -25,6 +25,12 @@ public class BidEventController {
         return Paging.shape(bids.list(mallId, status, p), page);
     }
 
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Object create(@Valid @RequestBody BidDtos.BidEventCreateRequest req) {
+        return bids.createEvent(req);
+    }
+
     @GetMapping("/{id}")
     public Object get(@PathVariable Integer id) {
         return bids.get(id);

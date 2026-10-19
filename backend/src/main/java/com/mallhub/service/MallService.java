@@ -8,6 +8,7 @@ import com.mallhub.exception.ApiException;
 import com.mallhub.repository.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -81,9 +82,9 @@ public class MallService {
         return stores.findByMallId(mallId, pageable).map(StoreService::toResponse);
     }
 
-    public List<MallDtos.ProductResponse> topProducts(Integer mallId) {
+    public List<MallDtos.ProductResponse> topProducts(Integer mallId, Integer storeId) {
         ensureMall(mallId);
-        return products.findTopSellingByMall(mallId).stream()
+        return products.findTopSellingByMall(mallId, storeId).stream()
                 .map(row -> {
                     var product = (com.mallhub.entity.Product) row[0];
                     var store = (Store) row[1];
@@ -119,6 +120,11 @@ public class MallService {
 
     public List<MallDtos.MallResponse> mallsByExecutive(Integer executiveId) {
         return toResponses(malls.findByExecutive(executiveId));
+    }
+
+    public List<MallDtos.MallResponse> nearest(Double lat, Double lng, Integer limit) {
+        int capped = Math.min(Math.max(limit == null ? 5 : limit, 1), 100);
+        return toResponses(malls.nearest(lat, lng, PageRequest.of(0, capped)).getContent());
     }
 
     private void ensureMall(Integer mallId) {

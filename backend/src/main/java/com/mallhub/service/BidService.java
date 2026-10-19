@@ -6,6 +6,8 @@ import com.mallhub.entity.BidEvent;
 import com.mallhub.exception.ApiException;
 import com.mallhub.repository.BidEventRepository;
 import com.mallhub.repository.BidRepository;
+import com.mallhub.repository.StoreRepository;
+import com.mallhub.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -22,10 +24,15 @@ import java.util.stream.Collectors;
 public class BidService {
     private final BidEventRepository events;
     private final BidRepository bids;
+    private final StoreRepository stores;
+    private final UserRepository users;
 
-    public BidService(BidEventRepository events, BidRepository bids) {
+    public BidService(BidEventRepository events, BidRepository bids,
+                      StoreRepository stores, UserRepository users) {
         this.events = events;
         this.bids = bids;
+        this.stores = stores;
+        this.users = users;
     }
 
     public Page<BidDtos.BidEventResponse> list(Integer mallId, String status, Pageable pageable) {
@@ -38,6 +45,38 @@ public class BidService {
 
     public BidDtos.BidEventResponse get(Integer eventId) {
         return toResponse(requireByEventId(eventId));
+    }
+
+    @Transactional
+    public BidDtos.BidEventResponse createEvent(BidDtos.BidEventCreateRequest req) {
+        if (req.endDate().isBefore(req.startDate())) {
+            throw ApiException.badRequest("end_date must be on or after start_date");
+        }
+        var store = stores.findById(req.storeId()).orElseThrow(() -> ApiException.notFound("Store"));
+        if (!"available".equalsIgnoreCase(store.getStatus())) {
+            throw ApiException.conflict("Store is not available for bidding");
+        }
+        if (events.existsByIdStoreIdAndStatus(req.storeId(), "open")) {
+            throw ApiException.conflict("Store already has an open bid event");
+        }
+        // ponytail: MAX+1 has a race under concurrent creates; upgrade to a DB
+        // sequence/unique index if event creation becomes concurrent.
+        int next = events.findMaxEventId() + 1;
+        var e = new BidEvent();
+        e.setId(new BidEvent.Id(req.storeId(), next));
+        e.setStartDate(req.startDate());
+        e.setEndDate(req.endDate());
+        e.setMinimumBidAmount(req.minimumBidAmount());
+        e.setMinimumBidIncrement(req.minimumBidIncrement());
+        e.setFinalAllocation(false);
+        e.setStatus("open");
+        events.save(e);
+        return toResponse(e);
+    }
+
+    public Page<BidDtos.BidResponse> bidsByUser(Integer userId, Pageable pageable) {
+        if (!users.existsById(userId)) throw ApiException.notFound("User");
+        return bids.findByIdUserId(userId, pageable).map(BidService::toResponse);
     }
 
     public Page<BidDtos.BidResponse> bidsByEvent(Integer eventId, Pageable pageable) {

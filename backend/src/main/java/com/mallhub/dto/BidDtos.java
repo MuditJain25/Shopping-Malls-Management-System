@@ -29,4 +29,10 @@ public final class BidDtos {
     // Accepted but NOT persisted until the final_allocation VARCHAR migration (DESIGN §6-D10).
     public record FinalizeRequest(String finalAllocation) {
     }
+
+    public record BidEventCreateRequest(@NotNull Integer storeId, @NotNull LocalDate startDate,
+                                        @NotNull LocalDate endDate,
+                                        @NotNull @Min(0) BigDecimal minimumBidAmount,
+                                        @NotNull @Min(0) BigDecimal minimumBidIncrement) {
+    }
 }

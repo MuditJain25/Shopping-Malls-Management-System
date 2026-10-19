@@ -45,6 +45,10 @@ public class EmployeeService {
 
     @Transactional
     public PeopleDtos.EmployeeResponse create(PeopleDtos.EmployeeCreateRequest req) {
+        if (req.email() != null && !req.email().isBlank()
+                && employees.findByEmail(req.email()).isPresent()) {
+            throw ApiException.conflict("Email is already registered");
+        }
         var store = stores.findById(req.storeId()).orElseThrow(() -> ApiException.notFound("Store"));
         var e = new Employee();
         e.setFirstName(req.firstName());
@@ -68,6 +72,20 @@ public class EmployeeService {
     public Page<PeopleDtos.LeaveResponse> leaves(Integer empId, Pageable pageable) {
         require(empId);
         return leaves.findByIdEmployeeId(empId, pageable).map(EmployeeService::toLeave);
+    }
+
+    public Page<PeopleDtos.StoreLeaveResponse> storeLeaves(Integer storeId, String status,
+                                                           Pageable pageable) {
+        if (!stores.existsById(storeId)) throw ApiException.notFound("Store");
+        String normalized = null;
+        if (status != null && !status.isBlank()) {
+            normalized = status.toLowerCase();
+            if (!normalized.equals("pending") && !normalized.equals("approved")
+                    && !normalized.equals("rejected")) {
+                throw ApiException.badRequest("status must be pending, approved or rejected");
+            }
+        }
+        return leaves.findForStore(storeId, normalized, pageable);
     }
 
     @Transactional

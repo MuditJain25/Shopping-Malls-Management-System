@@ -19,6 +19,14 @@ public interface StoreRepository extends JpaRepository<Store, Integer> {
 
     @Query("""
             SELECT s FROM Store s
+            WHERE (:mallId IS NULL OR s.mallId = :mallId)
+              AND (:status IS NULL OR LOWER(s.status) = LOWER(:status))
+            """)
+    Page<Store> search(@Param("mallId") Integer mallId, @Param("status") String status,
+                       Pageable pageable);
+
+    @Query("""
+            SELECT s FROM Store s
             JOIN StoreTenant st ON st.id.storeId = s.storeId
             WHERE st.id.tenantId = :tenantId
             """)

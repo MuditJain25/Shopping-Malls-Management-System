@@ -18,6 +18,14 @@ public class StoreController {
         this.stores = stores;
     }
 
+    @GetMapping
+    public Object list(@RequestParam(required = false) Integer mallId,
+                       @RequestParam(required = false) String status,
+                       @RequestParam(required = false) Integer page,
+                       @RequestParam(required = false) Integer size) {
+        return Paging.shape(stores.list(mallId, status, Paging.pageable(page, size, "storeId")), page);
+    }
+
     @GetMapping("/available")
     public Object available(@RequestParam(required = false) Integer mallId,
                             @RequestParam(required = false) Integer page,
@@ -28,6 +36,24 @@ public class StoreController {
     @GetMapping("/{id}")
     public Object get(@PathVariable Integer id) {
         return stores.get(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Object create(@Valid @RequestBody MallDtos.StoreCreateRequest req) {
+        return stores.create(req);
+    }
+
+    @PutMapping("/{id}")
+    public Object update(@PathVariable Integer id,
+                         @Valid @RequestBody MallDtos.StoreUpdateRequest req) {
+        return stores.update(id, req);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Integer id) {
+        stores.delete(id);
     }
 
     @GetMapping("/{id}/products")
