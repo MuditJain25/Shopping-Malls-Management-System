@@ -2,17 +2,14 @@
 // API CLIENT — Spring Boot Backend Integration
 // ═══════════════════════════════════════════════════════════════
 //
-// This file contains the API client for connecting to your Spring Boot
-// backend. Currently the app uses mock data (see mockData.js), but all
-// the real API calls are written here as commented-out code.
+// API client for the Spring Boot backend. Auth login/signup and mall analytics
+// are still mocked because the backend has no matching endpoints; everything
+// else calls the API directly.
 //
-// To switch to the real backend:
-//   1. Set VITE_API_BASE_URL in your .env file (e.g. http://localhost:8080/api)
-//   2. Uncomment the fetch calls in each function below
-//   3. Remove the mock data return statements
+// Set VITE_API_BASE_URL in .env (default http://localhost:8080/api).
 //
 // The Spring Boot backend exposes these REST endpoints (mirrors
-// com.mallhub.controller, verified against GET /v3/api-docs):
+// com.mallhub.controller):
 //
 // ── Auth ────────────────────────────────────────────────────────
 //   POST   /api/auth/google → { id_token } → { token, user }
@@ -21,66 +18,66 @@
 //   GET    /api/health → { status }
 //
 // ── Malls ───────────────────────────────────────────────────────
-//   GET    /api/malls → Mall[]
+//   GET    /api/malls?q=&city= → Mall[]
 //   GET    /api/malls/{id} → Mall
 //   GET    /api/malls/{id}/stores → Store[]
-//   GET    /api/malls/{id}/employees → Employee[]
-//   GET    /api/malls/{id}/manager → MallManager|null (singular)
+//   GET    /api/malls/nearest?lat=&lng=&limit= → Mall[]
+//   GET    /api/malls/{id}/products/top?storeId= → Product[]
+//   GET    /api/malls/{id}/manager → MallManager|null
+//   GET    /api/malls/{id}/employees?storeId= → Employee[]
+//   GET    /api/malls/{id}/bid-events?status= → BidEvent[]
 //   GET    /api/malls/{id}/offers → Offer[]
-//   GET    /api/malls/{id}/bid-events → BidEvent[]
-//   GET    /api/malls/nearest?lat=&lng=&limit= → Mall[] (closest first)
-//   GET    /api/malls/{id}/products/top?storeId= → Product[] (to_show=true)
 //
 // ── Stores ──────────────────────────────────────────────────────
-//   GET    /api/stores?mallId=&status= → Store[] (filtered)
-//   GET    /api/stores/available → Store[] (available for lease)
+//   GET    /api/stores?mallId=&status= → Store[]
+//   GET    /api/stores/available?mallId= → Store[]
 //   GET    /api/stores/{id} → Store
 //   POST   /api/stores → Store 201
 //   PUT    /api/stores/{id} → Store
 //   DELETE /api/stores/{id} → 204
-//   GET    /api/stores/{id}/products → Product[] (includes to_show)
-//   POST   /api/stores/{id}/products/{productId} → link existing product → Product 201
-//   PUT    /api/stores/{id}/products/{pid} → { to_show } toggle
+//   GET    /api/stores/{id}/products → Product[]
+//   POST   /api/stores/{id}/products/{productId} → Product 201
+//   PUT    /api/stores/{id}/products/{pid} → { to_show }
 //   GET    /api/stores/{id}/employees → Employee[]
 //   GET    /api/stores/{id}/offers → Offer[]
 //   POST   /api/stores/{id}/offers → Offer 201
 //   PUT    /api/stores/{id}/offers/{oid} → Offer
 //   DELETE /api/stores/{id}/offers/{oid} → 204
 //
-// ── Products (catalog) ──────────────────────────────────────────
-//   GET    /api/products?search= → Product[] (no paging; matches name OR category)
-//   POST   /api/products → Product 201 (catalog entry, no store link)
+// ── Products ────────────────────────────────────────────────────
+//   GET    /api/products?search= → Product[]
 //   GET    /api/products/{id} → Product
+//   POST   /api/products → Product 201
 //
 // ── Bid events & bids ───────────────────────────────────────────
-//   GET    /api/bid-events → BidEvent[]
+//   GET    /api/bid-events?status= → BidEvent[]
 //   GET    /api/bid-events/{id} → BidEvent
 //   POST   /api/bid-events → BidEvent 201
 //   GET    /api/bid-events/{id}/bids → Bid[]
 //   GET    /api/bids?userId= → Bid[]
-//   POST   /api/bid-events/{id}/bids → { userId, bidAmount } → Bid
+//   POST   /api/bid-events/{id}/bids → Bid
 //   PUT    /api/bid-events/{id}/finalize → finalize winning bid
 //
 // ── Tenants ─────────────────────────────────────────────────────
-//   GET    /api/tenants → Tenant[]
-//   POST   /api/tenants → Tenant 201
+//   GET    /api/tenants?mallId= → Tenant[]
 //   GET    /api/tenants/{id} → Tenant
+//   POST   /api/tenants → Tenant 201
 //   DELETE /api/tenants/{id} → 204
 //   GET    /api/tenants/{id}/stores → Store[]
 //   GET    /api/tenants/{id}/employees → Employee[]
-//   POST   /api/tenants/{id}/employees → create employee
+//   POST   /api/tenants/{id}/employees → Employee 201
 //   GET    /api/tenants/{id}/transactions → FinancialTransaction[]
 //   GET    /api/tenants/{id}/revenue → Revenue[]
 //   POST   /api/tenants/{id}/revenue → Revenue 201
 //
 // ── Employees ───────────────────────────────────────────────────
-//   GET    /api/employees/{id} → Employee
 //   POST   /api/employees → Employee 201
+//   GET    /api/employees/{id} → Employee
 //   DELETE /api/employees/{id} → 204
 //   GET    /api/employees/{id}/leave-requests → LeaveRequest[]
+//   POST   /api/employees/{id}/leave-requests → LeaveRequest 201
+//   PATCH  /api/employees/{id}/leave-requests/{rid} → LeaveRequest
 //   GET    /api/leave-requests?storeId=&status= → LeaveRequest[]
-//   POST   /api/employees/{id}/leave-requests → apply for leave
-//   PATCH  /api/employees/{id}/leave-requests/{rid} → approve/reject
 //   GET    /api/employees/{id}/payroll → PayrollRecord[]
 //   GET    /api/employees/{id}/attendance → Attendance[]
 //   POST   /api/employees/{id}/attendance/check-in
@@ -88,11 +85,11 @@
 //
 // ── Managers / executives / transactions ────────────────────────
 //   GET    /api/managers → MallManager[]
-//   POST   /api/managers → create Mall Manager
 //   GET    /api/managers/{id} → MallManager
+//   POST   /api/managers → MallManager 201
 //   GET    /api/executives/{id} → EnterpriseExecutive
 //   GET    /api/executives/{id}/malls → Mall[]
-//   GET    /api/transactions → FinancialTransaction[]
+//   GET    /api/transactions?mallId= → FinancialTransaction[]
 // ═══════════════════════════════════════════════════════════════
 
 import * as mock from "./mockData.js";
@@ -124,10 +121,105 @@ async function apiFetch(path, options = {}) {
   return response.json();
 }
 
+// ── Shape helpers ────────────────────────────────────────────────
+// Backend returns camelCase + integer ids; the UI was built on the
+// mockData.js snake_case shape. Normalize once here so pages don't
+// have to handle both shapes. Paged endpoints return a bare array
+// unless ?page= was sent (see Paging.shape), so unwrap both.
+function unwrap(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.content)) return data.content;
+  return data ?? [];
+}
+
+function toNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeMall(m) {
+  if (!m) return m;
+  return {
+    ...m,
+    mall_id: m.mallId ?? m.mall_id,
+    mall_name: m.mall_name ?? m.street ?? `${m.city ?? "Mall"}`,
+    city: m.city,
+    state: m.state,
+    imageUrl: m.imageUrl,
+    description: m.description,
+  };
+}
+
+function normalizeStore(s) {
+  if (!s) return s;
+  const media = s.listing_media ?? s.listingMedia;
+  return {
+    ...s,
+    store_id: s.storeId ?? s.store_id,
+    mall_id: s.mallId ?? s.mall_id,
+    store_name: s.storeName ?? s.store_name,
+    shop_number: s.shopNumber ?? s.shop_number,
+    area_sqft: s.areaSqft ?? s.area_sqft,
+    status: s.status,
+    floor: s.floor,
+    listing_media: Array.isArray(media) ? media : media ? [media] : [],
+  };
+}
+
+function normalizeProduct(p) {
+  if (!p) return p;
+  return {
+    ...p,
+    product_id: p.productId ?? p.product_id,
+    product_name: p.productName ?? p.product_name,
+    category: p.category,
+    price: toNum(p.price ?? 0),
+    imageUrl: p.imageUrl ?? p.image_url,
+    store: p.store ? normalizeStore(p.store) : p.store,
+  };
+}
+
+function normalizeBid(b) {
+  if (!b) return b;
+  return {
+    ...b,
+    bid_id: b.bidId ?? b.bid_id,
+    user_id: b.userId ?? b.user_id,
+    event_id: b.eventId ?? b.event_id,
+    store_id: b.storeId ?? b.store_id,
+    bid_amount: toNum(b.bidAmount ?? b.bid_amount ?? 0),
+    round_number: b.roundNumber ?? b.round_number,
+    bid_date: b.bidDate ?? b.bid_date,
+    status: b.status,
+    bidder_name: b.bidderName ?? b.bidder_name,
+  };
+}
+
+function normalizeBidEvent(e) {
+  if (!e) return e;
+  const winning = e.winningBid ?? e.winning_bid ?? null;
+  return {
+    ...e,
+    event_id: e.eventId ?? e.event_id,
+    store_id: e.storeId ?? e.store_id,
+    status: e.status,
+    minimum_bid_amount: toNum(e.minimumBidAmount ?? e.minimum_bid_amount ?? 0),
+    minimum_bid_increment: toNum(
+      e.minimumBidIncrement ?? e.minimum_bid_increment ?? 0,
+    ),
+    final_allocation: e.finalAllocation ?? e.final_allocation ?? null,
+    winningBid: winning ? normalizeBid(winning) : null,
+  };
+}
+
 // ── Auth ────────────────────────────────────────────────────────
 export async function apiLogin(email, password) {
-  // MOCK: check against demo users. Backend auth is Google-only (POST /auth/google);
-  // there is no /auth/login endpoint to call.
+  // return apiFetch('/auth/login', {
+  //   method: 'POST',
+  //   body: JSON.stringify({ email, password }),
+  // });
+
+  // MOCK: check against demo users
   const user = mock.demoUsers.find(
     (u) => u.email === email && u.password === password,
   );
@@ -143,7 +235,12 @@ export async function apiSignup({
   password,
   role,
 }) {
-  // MOCK: create a new user object. No signup endpoint exists on the backend.
+  // return apiFetch('/auth/signup', {
+  //   method: 'POST',
+  //   body: JSON.stringify({ firstName, lastName, email, password, role }),
+  // });
+
+  // MOCK: create a new user object
   return {
     id: `u${Date.now()}`,
     email,
@@ -155,44 +252,157 @@ export async function apiSignup({
 }
 
 export async function apiLogout() {
-  // return apiFetch('/auth/logout', { method: 'POST' });
-  return { success: true };
+  return apiFetch("/auth/logout", { method: "POST" });
+}
+
+export async function apiGoogleLogin(idToken) {
+  return apiFetch("/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ id_token: idToken }),
+  });
+}
+
+export async function apiGetCurrentUser() {
+  return apiFetch("/auth/me");
+}
+
+export async function apiHealth() {
+  return apiFetch("/health");
 }
 
 // ── Malls ──────────────────────────────────────────────────────
-export async function apiGetMalls() {
-  // return apiFetch('/malls');
-  return mock.malls;
+export async function apiGetMalls(q, city) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (city) params.set("city", city);
+  const qs = params.toString() ? `?${params}` : "";
+  const data = await apiFetch(`/malls${qs}`);
+  return unwrap(data).map(normalizeMall);
 }
 
 export async function apiGetMallById(id) {
-  return apiFetch(`/malls/${id}`);
+  const data = await apiFetch(`/malls/${id}`);
+  return normalizeMall(data);
+}
+
+export async function apiGetNearestMalls(lat, lng, limit = 5) {
+  const params = new URLSearchParams({ lat, lng, limit });
+  const data = await apiFetch(`/malls/nearest?${params}`);
+  return unwrap(data).map(normalizeMall);
+}
+
+export async function apiGetMallOffers(mallId) {
+  const data = await apiFetch(`/malls/${mallId}/offers`);
+  return unwrap(data);
 }
 
 // ── Stores ─────────────────────────────────────────────────────
+export async function apiGetStores(mallId, status) {
+  const params = new URLSearchParams();
+  if (mallId) params.set("mallId", mallId);
+  if (status) params.set("status", status);
+  const qs = params.toString() ? `?${params}` : "";
+  const data = await apiFetch(`/stores${qs}`);
+  return unwrap(data).map(normalizeStore);
+}
+
 export async function apiGetStoresByMall(mallId) {
-  // return apiFetch(`/malls/${mallId}/stores`);
-  return mock.getStoresByMall(mallId);
+  const data = await apiFetch(`/malls/${mallId}/stores`);
+  return unwrap(data).map(normalizeStore);
 }
 
 export async function apiGetAvailableStores(mallId) {
-  // return apiFetch(`/stores/available?mallId=${mallId}`);
-  return mock.getAvailableStores(mallId);
+  const qs = mallId ? `?mallId=${encodeURIComponent(mallId)}` : "";
+  const data = await apiFetch(`/stores/available${qs}`);
+  return unwrap(data).map(normalizeStore);
 }
 
 export async function apiGetStoreById(id) {
-  // return apiFetch(`/stores/${id}`);
-  return mock.getStoreById(id);
+  const data = await apiFetch(`/stores/${id}`);
+  return normalizeStore(data);
+}
+
+export async function apiCreateStore(storeData) {
+  const data = await apiFetch("/stores", {
+    method: "POST",
+    body: JSON.stringify(storeData),
+  });
+  return normalizeStore(data);
+}
+
+export async function apiUpdateStore(id, storeData) {
+  const data = await apiFetch(`/stores/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(storeData),
+  });
+  return normalizeStore(data);
+}
+
+export async function apiDeleteStore(id) {
+  return apiFetch(`/stores/${id}`, { method: "DELETE" });
+}
+
+export async function apiAttachProduct(storeId, productId, toShow) {
+  return apiFetch(`/stores/${storeId}/products/${productId}`, {
+    method: "POST",
+    ...(toShow === undefined
+      ? {}
+      : { body: JSON.stringify({ to_show: toShow }) }),
+  });
+}
+
+export async function apiGetStoreOffers(storeId) {
+  const data = await apiFetch(`/stores/${storeId}/offers`);
+  return unwrap(data);
+}
+
+export async function apiCreateOffer(storeId, offerData) {
+  return apiFetch(`/stores/${storeId}/offers`, {
+    method: "POST",
+    body: JSON.stringify(offerData),
+  });
+}
+
+export async function apiUpdateOffer(storeId, offerId, offerData) {
+  return apiFetch(`/stores/${storeId}/offers/${offerId}`, {
+    method: "PUT",
+    body: JSON.stringify(offerData),
+  });
+}
+
+export async function apiDeleteOffer(storeId, offerId) {
+  return apiFetch(`/stores/${storeId}/offers/${offerId}`, {
+    method: "DELETE",
+  });
 }
 
 // ── Products ───────────────────────────────────────────────────
+export async function apiGetProducts(search) {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : "";
+  const data = await apiFetch(`/products${qs}`);
+  return unwrap(data).map(normalizeProduct);
+}
+
+export async function apiGetProductById(id) {
+  return normalizeProduct(await apiFetch(`/products/${id}`));
+}
+
+export async function apiCreateProduct(productData) {
+  const data = await apiFetch("/products", {
+    method: "POST",
+    body: JSON.stringify(productData),
+  });
+  return normalizeProduct(data);
+}
+
 export async function apiGetProductsByStore(storeId) {
   return apiFetch(`/stores/${storeId}/products`);
 }
 
-export async function apiGetTopSellingProducts(mallId) {
-  // return apiFetch(`/malls/${mallId}/products/top`);
-  return mock.getTopSellingProducts(mallId);
+export async function apiGetTopSellingProducts(mallId, storeId) {
+  const qs = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
+  const data = await apiFetch(`/malls/${mallId}/products/top${qs}`);
+  return unwrap(data).map(normalizeProduct);
 }
 
 export async function apiToggleProductVisibility(storeId, productId, toShow) {
@@ -203,61 +413,88 @@ export async function apiToggleProductVisibility(storeId, productId, toShow) {
 }
 
 // ── Bid Events & Bids ──────────────────────────────────────────
-export async function apiGetBidEventsByMall(mallId) {
-  // return apiFetch(`/malls/${mallId}/bid-events`);
-  return mock.getBidEventsByMall(mallId);
+export async function apiGetBidEvents(status) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  const data = await apiFetch(`/bid-events${qs}`);
+  return unwrap(data).map(normalizeBidEvent);
+}
+
+export async function apiGetBidEventsByMall(mallId, status) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  const data = await apiFetch(`/malls/${mallId}/bid-events${qs}`);
+  return unwrap(data).map(normalizeBidEvent);
+}
+
+export async function apiGetBidEventById(eventId) {
+  const data = await apiFetch(`/bid-events/${eventId}`);
+  return normalizeBidEvent(data);
 }
 
 export async function apiGetBidsByEvent(eventId) {
-  // return apiFetch(`/bid-events/${eventId}/bids`);
-  return mock.getBidsByEvent(eventId);
+  const data = await apiFetch(`/bid-events/${eventId}/bids`);
+  return unwrap(data).map(normalizeBid);
+}
+
+export async function apiGetBidsByUser(userId) {
+  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const data = await apiFetch(`/bids${qs}`);
+  return unwrap(data).map(normalizeBid);
 }
 
 export async function apiPlaceBid(eventId, userId, bidAmount, bidderName) {
-  // return apiFetch(`/bid-events/${eventId}/bids`, {
-  //   method: 'POST',
-  //   body: JSON.stringify({ userId, bidAmount }),
-  // });
-  // MOCK: return a new bid object
-  const eventBids = mock.bids.filter((b) => b.event_id === eventId);
-  const winningBid = eventBids.find((b) => b.status === "winning");
-  if (winningBid) winningBid.status = "outbid";
-  const newBid = {
-    bid_id: `b${Date.now()}`,
-    user_id: userId,
-    event_id: eventId,
-    bid_amount: bidAmount,
-    round_number: eventBids.length + 1,
-    bid_date: new Date().toISOString(),
-    status: "winning",
-    bidder_name: bidderName,
-  };
-  mock.bids.push(newBid);
-  return newBid;
+  const uid = Number(userId);
+  if (!Number.isInteger(uid)) {
+    throw new Error(
+      "Sign in with a backend account to bid (demo users have no numeric id)",
+    );
+  }
+  const data = await apiFetch(`/bid-events/${eventId}/bids`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: uid,
+      bid_amount: bidAmount,
+      bidder_name: bidderName,
+    }),
+  });
+  return normalizeBid(data);
 }
 
 export async function apiFinalizeBidEvent(eventId, allocation) {
-  // return apiFetch(`/bid-events/${eventId}/finalize`, {
-  //   method: 'PUT',
-  //   body: JSON.stringify({ final_allocation: allocation }),
-  // });
-  const event = mock.bidEvents.find((be) => be.event_id === eventId);
-  if (event) {
-    event.status = "finalized";
-    event.final_allocation = allocation;
-  }
-  return event;
+  const data = await apiFetch(`/bid-events/${eventId}/finalize`, {
+    method: "PUT",
+    body: JSON.stringify({ final_allocation: allocation }),
+  });
+  return normalizeBidEvent(data);
+}
+
+export async function apiCreateBidEvent(eventData) {
+  const data = await apiFetch("/bid-events", {
+    method: "POST",
+    body: JSON.stringify(eventData),
+  });
+  return normalizeBidEvent(data);
 }
 
 // ── Tenants ────────────────────────────────────────────────────
-export async function apiGetTenants() {
-  // return apiFetch('/tenants');
-  return mock.tenants;
+export async function apiGetTenants(mallId) {
+  const qs = mallId ? `?mallId=${encodeURIComponent(mallId)}` : "";
+  const data = await apiFetch(`/tenants${qs}`);
+  return unwrap(data);
 }
 
 export async function apiGetTenantById(id) {
-  // return apiFetch(`/tenants/${id}`);
-  return mock.getTenantById(id);
+  return apiFetch(`/tenants/${id}`);
+}
+
+export async function apiCreateTenant(tenantData) {
+  return apiFetch("/tenants", {
+    method: "POST",
+    body: JSON.stringify(tenantData),
+  });
+}
+
+export async function apiDeleteTenant(id) {
+  return apiFetch(`/tenants/${id}`, { method: "DELETE" });
 }
 
 export async function apiGetStoresByTenant(tenantId) {
@@ -269,156 +506,149 @@ export async function apiGetEmployeesByTenant(tenantId) {
 }
 
 export async function apiGetEmployeesByStore(storeId) {
-  // return apiFetch(`/stores/${storeId}/employees`);
-  return mock.getEmployeesByStore(storeId);
+  const data = await apiFetch(`/stores/${storeId}/employees`);
+  return unwrap(data);
 }
 
+// Creates an employee assigned to a store.
+// Store-less employee creation is not supported by the backend yet.
+export async function apiAddStoreEmployee(tenantId, employeeData) {
+  return apiFetch(`/tenants/${tenantId}/employees`, {
+    method: "POST",
+    body: JSON.stringify(employeeData),
+  });
+}
+
+// Backend does not yet support creating store-less employees.
 export async function apiAddEmployee(employeeData) {
-  // Employees are created per tenant: POST /tenants/{tenantId}/employees.
-  const newEmp = { ...employeeData, employee_id: `e${Date.now()}` };
-  mock.employees.push(newEmp);
-  return newEmp;
+  return apiFetch("/employees", {
+    method: "POST",
+    body: JSON.stringify(employeeData),
+  });
+}
+
+export async function apiDeleteEmployee(id) {
+  return apiFetch(`/employees/${id}`, { method: "DELETE" });
 }
 
 export async function apiGetRevenueByTenant(tenantId) {
-  // Revenue is deferred: no /tenants/{id}/revenue endpoint exists.
-  return mock.getRevenueByTenant(tenantId);
+  const data = await apiFetch(`/tenants/${tenantId}/revenue`);
+  return unwrap(data);
 }
 
-export async function apiSubmitRevenue(
-  tenantId,
-  { description, month, amount },
-) {
-  // Revenue is deferred: no /tenants/{id}/revenue endpoint exists.
-  const newRecord = {
-    tenant_id: tenantId,
-    information_id: `ri${Date.now()}`,
-    description,
-    month,
-    amount,
-    submitted_date: new Date().toISOString().split("T")[0],
-  };
-  mock.revenueInfo.push(newRecord);
-  return newRecord;
+export async function apiSubmitRevenue(tenantId, { description }) {
+  return apiFetch(`/tenants/${tenantId}/revenue`, {
+    method: "POST",
+    body: JSON.stringify({ description }),
+  });
 }
 
 export async function apiGetTransactionsByTenant(tenantId) {
   return apiFetch(`/tenants/${tenantId}/transactions`);
 }
 
+export async function apiGetTransactionsByMall(mallId) {
+  const qs = mallId ? `?mallId=${encodeURIComponent(mallId)}` : "";
+  const data = await apiFetch(`/transactions${qs}`);
+  return unwrap(data);
+}
+
 // ── Mall Employees ─────────────────────────────────────────────
-export async function apiGetEmployeesByMall(mallId) {
-  // return apiFetch(`/malls/${mallId}/employees`);
-  return mock.getEmployeesByMall(mallId);
+export async function apiGetEmployeesByMall(mallId, storeId) {
+  const qs = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
+  const data = await apiFetch(`/malls/${mallId}/employees${qs}`);
+  return unwrap(data);
 }
 
 // ── Mall Managers ──────────────────────────────────────────────
 export async function apiGetManagers() {
-  // return apiFetch('/managers');
-  return mock.mallManagers;
+  const data = await apiFetch("/managers");
+  return unwrap(data);
+}
+
+export async function apiGetManagerById(id) {
+  return apiFetch(`/managers/${id}`);
 }
 
 export async function apiGetManagerByMall(mallId) {
-  // return apiFetch(`/malls/${mallId}/manager`);
-  return mock.getManagerByMall(mallId);
+  return apiFetch(`/malls/${mallId}/manager`);
 }
 
 export async function apiCreateManager(managerData) {
-  // return apiFetch('/managers', {
-  //   method: 'POST',
-  //   body: JSON.stringify(managerData),
-  // });
-  const newMgr = {
-    ...managerData,
-    manager_id: `mm${Date.now()}`,
-    date_joined: new Date().toISOString().split("T")[0],
-  };
-  mock.mallManagers.push(newMgr);
-  return newMgr;
+  return apiFetch("/managers", {
+    method: "POST",
+    body: JSON.stringify(managerData),
+  });
 }
 
 // ── Executives ─────────────────────────────────────────────────
 export async function apiGetExecutiveById(id) {
-  // return apiFetch(`/executives/${id}`);
-  return mock.executives.find((ex) => ex.executive_id === id);
+  return apiFetch(`/executives/${id}`);
+}
+
+export async function apiGetExecutiveMalls(id) {
+  const data = await apiFetch(`/executives/${id}/malls`);
+  return unwrap(data).map(normalizeMall);
 }
 
 // ── Employee Self-Service ──────────────────────────────────────
+// Backend responses are snake_case (Jackson SNAKE_CASE) and key the
+// employee foreign key as employee_id; the UI expects e_id, so map it.
 export async function apiGetEmployeeById(id) {
-  // return apiFetch(`/employees/${id}`);
-  return mock.getEmployeeById(id);
+  return apiFetch(`/employees/${id}`);
 }
 
 export async function apiGetLeaveRequests(empId) {
-  // return apiFetch(`/employees/${empId}/leave-requests`);
-  return mock.getLeaveRequestsByEmployee(empId);
+  const data = await apiFetch(`/employees/${empId}/leave-requests`);
+  return unwrap(data).map((r) => ({ ...r, e_id: r.e_id ?? r.employee_id }));
 }
 
 export async function apiApplyLeave(empId, { start_date, end_date, reason }) {
-  // return apiFetch(`/employees/${empId}/leave-requests`, {
-  //   method: 'POST',
-  //   body: JSON.stringify({ start_date, end_date, reason }),
-  // });
-  const newReq = {
-    e_id: empId,
-    request_id: `lr${Date.now()}`,
-    start_date,
-    end_date,
-    status: "pending",
-    reason,
-  };
-  mock.leaveRequests.push(newReq);
-  return newReq;
+  return apiFetch(`/employees/${empId}/leave-requests`, {
+    method: "POST",
+    body: JSON.stringify({ start_date, end_date, reason }),
+  });
+}
+
+export async function apiGetStoreLeaveRequests(storeId, status) {
+  const params = new URLSearchParams({ storeId });
+  if (status) params.set("status", status);
+  const data = await apiFetch(`/leave-requests?${params}`);
+  return unwrap(data).map((r) => ({ ...r, e_id: r.e_id ?? r.employee_id }));
+}
+
+export async function apiDecideLeave(empId, requestId, status) {
+  return apiFetch(`/employees/${empId}/leave-requests/${requestId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function apiGetPayroll(empId) {
-  // return apiFetch(`/employees/${empId}/payroll`);
-  return mock.getPayrollByEmployee(empId);
+  const data = await apiFetch(`/employees/${empId}/payroll`);
+  return unwrap(data).map((r) => ({ ...r, e_id: r.e_id ?? r.employee_id }));
 }
 
 export async function apiGetAttendance(empId) {
-  // return apiFetch(`/employees/${empId}/attendance`);
-  return mock.getAttendanceByEmployee(empId);
+  const data = await apiFetch(`/employees/${empId}/attendance`);
+  return unwrap(data).map((r) => ({ ...r, e_id: r.e_id ?? r.employee_id }));
 }
 
 export async function apiCheckIn(empId) {
-  // return apiFetch(`/employees/${empId}/attendance/check-in`, { method: 'POST' });
-  const today = new Date().toISOString().split("T")[0];
-  const time = new Date().toTimeString().slice(0, 5);
-  const existing = mock.attendanceRecords.find(
-    (a) => a.e_id === empId && a.date === today,
-  );
-  if (existing) {
-    existing.check_in_time = time;
-    return existing;
-  }
-  const record = {
-    e_id: empId,
-    date: today,
-    check_in_time: time,
-    check_out_time: null,
-  };
-  mock.attendanceRecords.push(record);
-  return record;
+  return apiFetch(`/employees/${empId}/attendance/check-in`, {
+    method: "POST",
+  });
 }
 
 export async function apiCheckOut(empId) {
-  // return apiFetch(`/employees/${empId}/attendance/check-out`, { method: 'POST' });
-  const today = new Date().toISOString().split("T")[0];
-  const time = new Date().toTimeString().slice(0, 5);
-  const existing = mock.attendanceRecords.find(
-    (a) => a.e_id === empId && a.date === today,
-  );
-  if (existing) {
-    existing.check_out_time = time;
-    return existing;
-  }
-  return null;
+  return apiFetch(`/employees/${empId}/attendance/check-out`, {
+    method: "POST",
+  });
 }
 
 // ── Analytics ─────────────────────────────────────────────────
 export async function apiGetMallAnalytics(mallId) {
-  // Analytics is deferred: no /analytics/mall/{id} endpoint exists.
+  // return apiFetch(`/analytics/mall/${mallId}`);
   // MOCK: compute from mock data
   const mallStores = mock.getStoresByMall(mallId);
   const occupiedStores = mallStores.filter((s) => s.status === "occupied");
