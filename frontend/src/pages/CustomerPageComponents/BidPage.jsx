@@ -71,7 +71,7 @@ export default function BidPage({ eventId, storeId, user }) {
     setSubmitting(true);
     try {
       console.log(event,amount,user)
-      await apiPlaceBid(event.event_id, user.id, amount, `${user.firstName} ${user.lastName}`);
+      await apiPlaceBid(event.event_id, user, amount, `${user.firstName} ${user.lastName}`);
       await fetchBids();
       setSuccess(`Bid of $${amount.toLocaleString()} placed successfully!`);
       setBidAmount('');

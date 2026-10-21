@@ -1,26 +1,12 @@
 ﻿import React, { useState } from "react";
 import { ChevronRight, MapPin, Building2 } from "lucide-react";
-// import { getAvailableStores } from '../../lib/api';
 import { Badge, ErrorState, EmptyState } from "@/components/ui/index.jsx";
-import {
-  malls,
-  getStoresByMall,
-  getTopSellingProducts,
-  getAvailableStores,
-  getBidEventsByMall,
-  getBidsByEvent,
-  getWinningBid,
-  bidEvents,
-  stores,
-  storeProducts,
-  getMallById,
-  getStoreById,
-} from "@/lib/mockData.js";
 
 export default function MallDetail({
   mall,
   stores,
   topProducts,
+  availableCount,
   categories,
   selectedCategory,
   setSelectedCategory,
@@ -29,14 +15,10 @@ export default function MallDetail({
   onExploreProperties,
 }) {
   const [selectedStore, setSelectedStore] = useState(null);
+  // Top products arrive with their store embedded, so the store filter needs no extra query.
   const displayedProducts = selectedStore
-    ? categoryProducts.filter((product) =>
-        storeProducts.some(
-          (item) =>
-            item.store_id === selectedStore &&
-            item.product_id === product.product_id &&
-            item.to_show,
-        ),
+    ? categoryProducts.filter(
+        (product) => product.store?.store_id === selectedStore,
       )
     : categoryProducts;
 
@@ -52,8 +34,6 @@ export default function MallDetail({
       : selectedCategory;
 
   const showAllCategory = !selectedStore || visibleCategories.length > 1;
-
-  const availableCount = getAvailableStores(mall.mall_id).length;
 
   const handleStoreSelect = (storeId) => {
     setSelectedStore(selectedStore === storeId ? null : storeId);
@@ -107,7 +87,7 @@ export default function MallDetail({
         </div>
         <div className="card p-3 text-center">
           <p className="text-xl font-bold text-slate-900">
-            {mall.contact_numbers.length}
+            {mall.contact_numbers?.length || 0}
           </p>
           <p className="text-xs text-slate-500">Contact Lines</p>
         </div>

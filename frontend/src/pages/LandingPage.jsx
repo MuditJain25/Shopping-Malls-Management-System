@@ -1,44 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   ShoppingBag,
   MapPin,
   Search,
-  Star,
-  ArrowRight,
   Building2,
   Tag,
   Gavel,
   TrendingUp,
-  Phone,
-  ChevronRight,
-  Check,
-  AlertCircle,
-  Store,
 } from "lucide-react";
 import { useRouter } from "@/context/RouterContext.jsx";
 import { useAuth } from "@/context/AuthContext.jsx";
 import {
-  malls,
-  getStoresByMall,
-  getTopSellingProducts,
-  getAvailableStores,
-  getBidEventsByMall,
-  getBidsByEvent,
-  getWinningBid,
-  bidEvents,
-  stores,
-  getMallById,
-  getStoreById,
-} from "@/lib/mockData.js";
-import { apiPlaceBid } from "@/lib/api.js";
-import Modal from "@/components/ui/Modal.jsx";
-import { Badge, ErrorState, EmptyState } from "@/components/ui/index.jsx";
+  apiGetMalls,
+  apiGetStoresByMall,
+  apiGetTopSellingProducts,
+  apiGetAvailableStores,
+  apiGetBidEvents,
+} from "@/lib/api.js";
+import { ErrorState, EmptyState, LoadingSpinner } from "@/components/ui/index.jsx";
 import BidPage from "./LandingPageComponents/BidPage.jsx";
 import MallDetail from "./LandingPageComponents/MallDetail.jsx";
 import PropertiesList from "./LandingPageComponents/PropertiesList.jsx";
 import PropertyDetail from "./LandingPageComponents/PropertyDetail.jsx";
-
-const CATEGORIES = ["Fashion", "Electronics", "Home & Decor", "Beauty"];
 
 export default function LandingPage() {
   const [view, setView] = useState("home");
@@ -47,6 +30,7 @@ export default function LandingPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [suggestions, setSuggestions] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [bidEvent, setBidEvent] = useState(null);
   const { navigate } = useRouter();
@@ -54,44 +38,163 @@ export default function LandingPage() {
   const [userLatitue, setUserLatitude] = useState();
   const [userLongitude, setUserLongitude] = useState();
 
-  const handleSelectMall = (mall) => {
-    setSelectedMall(mall);
-    setView("mall-detail");
-  };
+  // Malls shown in the home grid.
+  const [malls, setMalls] = useState([]);
+  const [storeCountByMall, setStoreCountByMall] = useState({});
+  const [productCountByMall, setProductCountByMall] = useState({});
+  const [mallsLoading, setMallsLoading] = useState(true);
+  const [mallsError, setMallsError] = useState("");
 
-  const searchSuggestions = searchInput
-    ? malls
-        .filter(
-          (m) =>
-            m.city.toLowerCase().includes(searchInput.toLowerCase()) ||
-            m.state.toLowerCase().includes(searchInput.toLowerCase()) ||
-            m.mall_name.toLowerCase().includes(searchInput.toLowerCase()),
-        )
-        .slice(0, 6)
-    : [];
+  // Detail of the mall the user opened.
+  const [mallStores, setMallStores] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [availableCount, setAvailableCount] = useState(0);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
-  const filteredMalls = malls.filter(
-    (m) =>
-      !searchQuery ||
-      m.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.state.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.mall_name.toLowerCase().includes(searchQuery.toLowerCase()),
+  // Available properties, with the mall and open bid event each one belongs to.
+  const [availableStores, setAvailableStores] = useState([]);
+  const [mallById, setMallById] = useState({});
+  const [eventByStore, setEventByStore] = useState({});
+  const [propsLoading, setPropsLoading] = useState(false);
+  const [propsError, setPropsError] = useState("");
+
+  const selectedMallId = selectedMall?.mall_id;
+  const categories = Array.from(
+    new Set(topProducts.map((p) => p.category).filter(Boolean)),
   );
-
-  const mallStores = selectedMall
-    ? getStoresByMall(selectedMall.mall_id).filter(
-        (s) => s.status === "occupied",
-      )
-    : [];
-  const topProducts = selectedMall
-    ? getTopSellingProducts(selectedMall.mall_id)
-    : [];
   const categoryProducts = selectedCategory
     ? topProducts.filter((p) => p.category === selectedCategory)
     : topProducts;
 
-  const allAvailableStores = stores.filter((s) => s.status === "available");
+  // The mall grid is filtered by the database, not in the browser. The card counters
+  // come from the same existing per-mall endpoints the detail view already uses.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    let cancelled = false;
+    (async () => {
+      try {
+        setMallsLoading(true);
+        setMallsError("");
+        const list = await apiGetMalls(q ? { q } : {});
+        if (cancelled) return;
+        setMalls(list);
+        const [storesPerMall, productsPerMall] = await Promise.all([
+          Promise.all(
+            list.map((m) => apiGetStoresByMall(m.mall_id).catch(() => [])),
+          ),
+          Promise.all(
+            list.map((m) =>
+              apiGetTopSellingProducts(m.mall_id).catch(() => []),
+            ),
+          ),
+        ]);
+        if (cancelled) return;
+        const storeCounts = {};
+        const productCounts = {};
+        list.forEach((m, i) => {
+          storeCounts[m.mall_id] = storesPerMall[i].length;
+          productCounts[m.mall_id] = productsPerMall[i].length;
+        });
+        setStoreCountByMall(storeCounts);
+        setProductCountByMall(productCounts);
+      } catch (err) {
+        if (!cancelled) setMallsError(err.message || "Failed to load malls");
+      } finally {
+        if (!cancelled) setMallsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery]);
+
+  // Type-ahead suggestions come from the same search endpoint, limited to 6 rows.
+  useEffect(() => {
+    const q = searchInput.trim();
+    if (!q || q === searchQuery.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setSuggestions(await apiGetMalls({ q, page: 0, size: 6 }));
+      } catch {
+        setSuggestions([]);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchInput, searchQuery]);
+
+  // Stores, top products and availability of the opened mall.
+  useEffect(() => {
+    if (selectedMallId == null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setDetailLoading(true);
+        setDetailError("");
+        const [stores, products, available] = await Promise.all([
+          apiGetStoresByMall(selectedMallId),
+          apiGetTopSellingProducts(selectedMallId),
+          apiGetAvailableStores(selectedMallId),
+        ]);
+        if (cancelled) return;
+        setMallStores(stores.filter((s) => s.status === "occupied"));
+        setTopProducts(products);
+        setAvailableCount(available.length);
+      } catch (err) {
+        if (!cancelled) setDetailError(err.message || "Failed to load mall");
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMallId]);
+
+  // The properties view needs every available store plus its mall and open event.
+  useEffect(() => {
+    if (view !== "properties") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setPropsLoading(true);
+        setPropsError("");
+        const [stores, mallList, openEvents] = await Promise.all([
+          apiGetAvailableStores(),
+          apiGetMalls(),
+          apiGetBidEvents("open"),
+        ]);
+        if (cancelled) return;
+        setAvailableStores(stores);
+        const mallsById = {};
+        mallList.forEach((m) => {
+          mallsById[m.mall_id] = m;
+        });
+        setMallById(mallsById);
+        const eventsByStore = {};
+        openEvents.forEach((e) => {
+          eventsByStore[e.store_id] = e;
+        });
+        setEventByStore(eventsByStore);
+      } catch (err) {
+        if (!cancelled) setPropsError(err.message || "Failed to load properties");
+      } finally {
+        if (!cancelled) setPropsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [view]);
+
+  const handleSelectMall = (mall) => {
+    setSelectedMall(mall);
+    setSelectedCategory(null);
+    setView("mall-detail");
+  };
 
   const handleExploreProperties = () => {
     setView("properties");
@@ -108,9 +211,7 @@ export default function LandingPage() {
   };
 
   const handleOpenBid = (property) => {
-    const event = bidEvents.find(
-      (be) => be.store_id === property.store_id && be.status === "open",
-    );
+    const event = eventByStore[property.store_id];
     if (event) {
       setBidEvent(event);
       setSelectedProperty(property);
@@ -227,12 +328,12 @@ export default function LandingPage() {
                     onKeyDown={(e) => {
                       if (
                         e.key === "ArrowDown" &&
-                        searchSuggestions.length > 0
+                        suggestions.length > 0
                       ) {
                         e.preventDefault();
 
                         setHighlightedIndex((prev) =>
-                          prev < searchSuggestions.length - 1 ? prev + 1 : prev,
+                          prev < suggestions.length - 1 ? prev + 1 : prev,
                         );
                       } else if (e.key === "ArrowUp") {
                         e.preventDefault();
@@ -243,9 +344,7 @@ export default function LandingPage() {
                       } else if (e.key === "Enter" && highlightedIndex !== -1) {
                         e.preventDefault();
 
-                        handleSuggestionClick(
-                          searchSuggestions[highlightedIndex],
-                        );
+                        handleSuggestionClick(suggestions[highlightedIndex]);
 
                         setHighlightedIndex(-1);
                       }
@@ -253,29 +352,28 @@ export default function LandingPage() {
                     placeholder="Search by city or mall name..."
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm"
                   />
-                  {searchInput !== searchQuery &&
-                    searchSuggestions.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg overflow-hidden z-20">
-                        {searchSuggestions.map((mall, index) => (
-                          <div
-                            key={mall.mall_id}
-                            onClick={() => handleSuggestionClick(mall)}
-                            className={`px-4 py-2 cursor-pointer ${
-                              highlightedIndex === index
-                                ? "bg-slate-200"
-                                : "hover:bg-slate-50"
-                            }`}
-                          >
-                            <p className="text-sm font-medium text-slate-800">
-                              {mall.mall_name}
-                              <span className="ml-2 text-xs font-normal text-slate-400">
-                                {mall.city}, {mall.state}
-                              </span>
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  {searchInput !== searchQuery && suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg overflow-hidden z-20">
+                      {suggestions.map((mall, index) => (
+                        <div
+                          key={mall.mall_id}
+                          onClick={() => handleSuggestionClick(mall)}
+                          className={`px-4 py-2 cursor-pointer ${
+                            highlightedIndex === index
+                              ? "bg-slate-200"
+                              : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <p className="text-sm font-medium text-slate-800">
+                            {mall.mall_name}
+                            <span className="ml-2 text-xs font-normal text-slate-400">
+                              {mall.city}, {mall.state}
+                            </span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="submit"
@@ -306,44 +404,55 @@ export default function LandingPage() {
             <p className="text-sm text-slate-500 mb-6">
               Discover shopping centers in your area
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredMalls.map((mall) => (
-                <button
-                  key={mall.mall_id}
-                  onClick={() => handleSelectMall(mall)}
-                  className="card overflow-hidden text-left hover:shadow-md transition-shadow"
-                >
-                  <div className="relative h-40 overflow-hidden">
-                    <img
-                      src={mall.imageUrl}
-                      alt={mall.city}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-2 left-3 text-white text-sm flex items-center gap-1">
-                      <MapPin size={12} /> {mall.city}, {mall.state}
+            {mallsLoading ? (
+              <LoadingSpinner label="Loading malls..." />
+            ) : mallsError ? (
+              <ErrorState message={mallsError} />
+            ) : malls.length === 0 ? (
+              <EmptyState
+                title="No malls found"
+                message="No shopping center matches your search."
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {malls.map((mall) => (
+                  <button
+                    key={mall.mall_id}
+                    onClick={() => handleSelectMall(mall)}
+                    className="card overflow-hidden text-left hover:shadow-md transition-shadow"
+                  >
+                    <div className="relative h-40 overflow-hidden">
+                      <img
+                        src={mall.imageUrl}
+                        alt={mall.city}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-2 left-3 text-white text-sm flex items-center gap-1">
+                        <MapPin size={12} /> {mall.city}, {mall.state}
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-slate-900 mb-1 text-sm">
-                      {mall.mall_name}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-2 mb-2">
-                      {mall.description}
-                    </p>
-                    <div className="flex items-center gap-3 text-xs text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Building2 size={12} />{" "}
-                        {getStoresByMall(mall.mall_id).length} stores
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Tag size={12} />{" "}
-                        {getTopSellingProducts(mall.mall_id).length} products
-                      </span>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-slate-900 mb-1 text-sm">
+                        {mall.mall_name}
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-2 mb-2">
+                        {mall.description}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Building2 size={12} />{" "}
+                          {storeCountByMall[mall.mall_id] ?? 0} stores
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Tag size={12} />{" "}
+                          {productCountByMall[mall.mall_id] ?? 0} products
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="bg-white border-t border-slate-200">
@@ -392,35 +501,59 @@ export default function LandingPage() {
       )}
 
       {view === "mall-detail" && selectedMall && (
-        <MallDetail
-          mall={selectedMall}
-          stores={mallStores}
-          topProducts={topProducts}
-          categories={CATEGORIES}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          categoryProducts={categoryProducts}
-          onBack={() => {
-            setView("home");
-            setSelectedMall(null);
-          }}
-          onExploreProperties={handleExploreProperties}
-        />
+        <>
+          {detailLoading ? (
+            <LoadingSpinner label="Loading mall..." />
+          ) : detailError ? (
+            <div className="max-w-6xl mx-auto px-4 py-6">
+              <ErrorState message={detailError} />
+            </div>
+          ) : (
+            <MallDetail
+              mall={selectedMall}
+              stores={mallStores}
+              topProducts={topProducts}
+              availableCount={availableCount}
+              categories={categories}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              categoryProducts={categoryProducts}
+              onBack={() => {
+                setView("home");
+                setSelectedMall(null);
+              }}
+              onExploreProperties={handleExploreProperties}
+            />
+          )}
+        </>
       )}
 
       {view === "properties" && (
-        <PropertiesList
-          stores={allAvailableStores}
-          onBack={() => setView("home")}
-          onOpenBid={handleOpenBid}
-          user={user}
-          onSignIn={() => navigate("/signin")}
-        />
+        <>
+          {propsLoading ? (
+            <LoadingSpinner label="Loading properties..." />
+          ) : propsError ? (
+            <div className="max-w-6xl mx-auto px-4 py-6">
+              <ErrorState message={propsError} />
+            </div>
+          ) : (
+            <PropertiesList
+              stores={availableStores}
+              mallById={mallById}
+              eventByStore={eventByStore}
+              onBack={() => setView("home")}
+              onOpenBid={handleOpenBid}
+              user={user}
+              onSignIn={() => navigate("/signin")}
+            />
+          )}
+        </>
       )}
 
       {view === "property-detail" && selectedProperty && (
         <PropertyDetail
           property={selectedProperty}
+          mall={mallById[selectedProperty.mall_id]}
           onBack={() => setView("properties")}
         />
       )}
@@ -429,6 +562,7 @@ export default function LandingPage() {
         <BidPage
           event={bidEvent}
           property={selectedProperty}
+          mall={mallById[selectedProperty.mall_id]}
           user={user}
           onBack={() => setView("properties")}
           onSignIn={() => navigate("/signin")}

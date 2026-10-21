@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { ChevronRight, MapPin, Phone } from 'lucide-react';
 
 import { Badge, ErrorState, EmptyState } from '@/components/ui/index.jsx';
-import { getMallById } from '@/lib/mockData.js';
 
-export default function PropertyDetail({ property, onBack }) {
-  const mall = getMallById(property.mall_id);
+export default function PropertyDetail({ property, mall, onBack }) {
   const [activeMedia, setActiveMedia] = useState(0);
+  const media = property.listing_media || [];
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-4">
@@ -16,16 +15,16 @@ export default function PropertyDetail({ property, onBack }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <div className="card overflow-hidden mb-2">
-            <img src={property.listing_media[activeMedia]} alt={property.store_name} className="w-full h-56 object-cover" />
+            {media[activeMedia] && <img src={media[activeMedia]} alt={property.store_name} className="w-full h-56 object-cover" />}
           </div>
           <div className="flex gap-2">
-            {property.listing_media.map((media, i) => (
+            {media.map((item, i) => (
               <button
                 key={i}
                 onClick={() => setActiveMedia(i)}
                 className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${activeMedia === i ? 'border-brand-500' : 'border-transparent'}`}
               >
-                <img src={media} alt="" className="w-full h-full object-cover" />
+                <img src={item} alt="" className="w-full h-full object-cover" />
               </button>
             ))}
           </div>

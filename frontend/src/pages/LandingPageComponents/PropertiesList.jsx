@@ -2,9 +2,8 @@ import React from 'react';
 import { ChevronRight, MapPin, Gavel } from 'lucide-react';
 
 import { Badge, ErrorState, EmptyState } from '@/components/ui/index.jsx';
-import { getWinningBid, bidEvents,getMallById } from '@/lib/mockData.js';
 
-export default function PropertiesList({ stores, onBack, onOpenBid, user, onSignIn }) {
+export default function PropertiesList({ stores, mallById, eventByStore, onBack, onOpenBid, user, onSignIn }) {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-4">
@@ -17,9 +16,9 @@ export default function PropertiesList({ stores, onBack, onOpenBid, user, onSign
         {stores.length === 0 ? (
           <div className="col-span-full"><EmptyState title="No properties available" message="Check back later for new listings." /></div>
         ) : stores.map(store => {
-          const mall = getMallById(store.mall_id);
-          const event = bidEvents.find(be => be.store_id === store.store_id && be.status === 'open');
-          const winningBid = event ? getWinningBid(event.event_id) : null;
+          const mall = mallById[store.mall_id];
+          const event = eventByStore[store.store_id];
+          const winningBid = event?.winningBid;
           return (
             <div key={store.store_id} className="card overflow-hidden">
               <div className="relative h-40 overflow-hidden">

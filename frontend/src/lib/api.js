@@ -106,7 +106,7 @@ function normalizeMall(m) {
     mall_name: m.mall_name ?? m.street ?? `${m.city ?? "Mall"}`,
     city: m.city,
     state: m.state,
-    imageUrl: m.imageUrl,
+    imageUrl: m.imageUrl ?? m.image_url,
     description: m.description,
   };
 }
@@ -216,8 +216,15 @@ export async function apiLogout() {
 }
 
 // ── Malls ──────────────────────────────────────────────────────
-export async function apiGetMalls() {
-  const data = await apiFetch("/malls");
+// q / city are matched by the database (see MallRepository.search).
+export async function apiGetMalls({ q, city, page, size } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (city) params.set("city", city);
+  if (page != null) params.set("page", String(page));
+  if (size != null) params.set("size", String(size));
+  const qs = params.toString();
+  const data = await apiFetch(`/malls${qs ? `?${qs}` : ""}`);
   return unwrap(data).map(normalizeMall);
 }
 
@@ -294,14 +301,29 @@ export async function apiGetBidsByEvent(eventId) {
   return unwrap(data).map(normalizeBid);
 }
 
-export async function apiPlaceBid(eventId, userId, bidAmount, bidderName) {
-  const uid = Number(userId);
-  if (!Number.isInteger(uid)) {
-    throw new Error("Sign in with a backend account to bid (demo users have no numeric id)");
+// Bid.user_id is an INT foreign key to the User table. The demo sign-in id ("111")
+// is not one, so the real account id is resolved through /auth/me, which in demo
+// mode creates the User row on the first call. Only the "customer" role maps to
+// the User table, so any other role has no valid bidder id.
+const backendUserIds = new Map();
+
+async function apiResolveUserId(email) {
+  if (!email) throw new Error("Sign in to place a bid");
+  if (backendUserIds.has(email)) return backendUserIds.get(email);
+  const data = await apiFetch(`/auth/me?email=${encodeURIComponent(email)}`);
+  const resolved = data?.user;
+  if (resolved?.role !== "customer" || !Number.isInteger(resolved.id)) {
+    throw new Error("Only customer accounts can place bids");
   }
+  backendUserIds.set(email, resolved.id);
+  return resolved.id;
+}
+
+export async function apiPlaceBid(eventId, user, bidAmount, bidderName) {
+  const userId = await apiResolveUserId(user?.email);
   const data = await apiFetch(`/bid-events/${eventId}/bids`, {
     method: "POST",
-    body: JSON.stringify({ user_id: uid, bid_amount: bidAmount, bidder_name: bidderName }),
+    body: JSON.stringify({ user_id: userId, bid_amount: bidAmount, bidder_name: bidderName }),
   });
   return normalizeBid(data);
 }

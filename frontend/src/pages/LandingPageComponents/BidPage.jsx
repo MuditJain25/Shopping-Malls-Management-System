@@ -2,12 +2,10 @@
   import { ChevronRight, MapPin, TrendingUp, AlertCircle, Check } from 'lucide-react';
 
   import { Badge, ErrorState, EmptyState } from '@/components/ui/index.jsx'
-  import { getBidsByEvent,  getMallById} from '@/lib/mockData.js';
-  import { apiPlaceBid } from '@/lib/api.js';
+  import { apiGetBidsByEvent, apiPlaceBid } from '@/lib/api.js';
 
 
-  export default function BidPage({ event, property, user, onBack, onSignIn }) {
-    const mall = getMallById(property.mall_id);
+  export default function BidPage({ event, property, mall, user, onBack, onSignIn }) {
     const [bids, setBids] = useState([]);
     const [loading, setLoading] = useState(true);
     const [bidAmount, setBidAmount] = useState('');
@@ -16,9 +14,14 @@
     const [success, setSuccess] = useState('');
 
     const fetchBids = useCallback(async () => {
-      const data = getBidsByEvent(event.event_id);
-      setBids(data);
-      setLoading(false);
+      try {
+        const data = await apiGetBidsByEvent(event.event_id);
+        setBids(data);
+      } catch (err) {
+        setError(err.message || 'Failed to refresh bids');
+      } finally {
+        setLoading(false);
+      }
     }, [event.event_id]);
 
     useEffect(() => {
@@ -41,7 +44,7 @@
       setError('');
       setSubmitting(true);
       try {
-        await apiPlaceBid(event.event_id, user.id, amount, `${user.firstName} ${user.lastName}`);
+        await apiPlaceBid(event.event_id, user, amount, `${user.firstName} ${user.lastName}`);
         await fetchBids();
         setSuccess(`Bid of $${amount.toLocaleString()} placed successfully!`);
         setBidAmount('');
