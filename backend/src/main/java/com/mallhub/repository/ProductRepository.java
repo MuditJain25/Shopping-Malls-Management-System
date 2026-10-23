@@ -26,6 +26,8 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
             JOIN Product p ON p.productId = sp.id.productId
             JOIN Store s ON s.storeId = sp.id.storeId
             WHERE s.mallId = :mallId AND sp.toShow = TRUE
+              AND (:storeId IS NULL OR s.storeId = :storeId)
             """)
-    List<Object[]> findTopSellingByMall(@Param("mallId") Integer mallId);
+    List<Object[]> findTopSellingByMall(@Param("mallId") Integer mallId,
+                                        @Param("storeId") Integer storeId);
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronRight, MapPin, Phone } from 'lucide-react';
 import { useRouter } from '@/context/RouterContext.jsx';
 import { Badge, ErrorState, EmptyState, LoadingSpinner } from '@/components/ui/index.jsx';
-import { apiGetMallById, apiGetStoreById } from '@/lib/api.js';
+import { apiGetMallById, apiGetStoreById, apiGetBidEvents } from '@/lib/api.js';
 
 export default function PropertyDetail({ storeId }) {
   const { navigate } = useRouter();
@@ -27,12 +27,14 @@ export default function PropertyDetail({ storeId }) {
           if (!cancelled) setMall(m);
         }
         try {
-          const events = await (await import('@/lib/api.js')).apiGetBidEvents('open');
+          const events = await apiGetBidEvents('open');
           if (!cancelled) {
             const ev = events.find(e => e.store_id === store.store_id);
             setEvent(ev || null);
           }
-        } catch {}
+        } catch {
+          if (!cancelled) setEvent(null);
+        }
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load property');
       } finally {

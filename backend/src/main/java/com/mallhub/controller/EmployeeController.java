@@ -19,6 +19,12 @@ public class EmployeeController {
         this.employees = employees;
     }
 
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Object create(@Valid @RequestBody PeopleDtos.EmployeeCreateRequest req) {
+        return employees.create(req);
+    }
+
     @GetMapping("/{id}")
     public Object get(@PathVariable Integer id) {
         return employees.get(id);

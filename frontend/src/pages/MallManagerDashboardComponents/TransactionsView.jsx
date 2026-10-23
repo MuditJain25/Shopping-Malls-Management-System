@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PageHeader, DataTable, Badge, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import { apiGetTenants, apiGetTransactionsByMall } from '@/lib/api.js';
 
-export default function AgreementsView({ mallId }) {
+export default function TransactionsView({ mallId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -24,10 +24,10 @@ export default function AgreementsView({ mallId }) {
 
   return (
     <div>
-      <PageHeader title="Store Agreements & Tenants" subtitle="Complete transaction and agreement information" />
+      <PageHeader title="Mall Transactions" subtitle="Complete transactions related to mall" />
 
-      <h3 className="font-semibold text-slate-900 mb-3">Tenant Agreements</h3>
-      <div className="card overflow-hidden mb-8">
+      {/* <h3 className="font-semibold text-slate-900 mb-3">Tenant Agreements</h3> */}
+      {/* <div className="card overflow-hidden mb-8">
         <DataTable
           columns={[
             { key: 'business_name', label: 'Business', render: t => <span className="font-medium text-slate-800">{t.business_name}</span> },
@@ -39,7 +39,7 @@ export default function AgreementsView({ mallId }) {
           rows={mallTenants}
           emptyMessage="No tenant agreements found."
         />
-      </div>
+      </div> */}
 
       <h3 className="font-semibold text-slate-900 mb-3">Transaction History</h3>
       <div className="card overflow-hidden">

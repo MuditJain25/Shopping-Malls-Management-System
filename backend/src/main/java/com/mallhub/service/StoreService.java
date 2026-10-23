@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,15 +27,25 @@ public class StoreService {
     private final StoreProductRepository links;
     private final EmployeeRepository employees;
     private final OfferRepository offers;
+    private final MallRepository malls;
+    private final StoreTenantRepository joins;
+    private final BidEventRepository bidEvents;
+    private final BidRepository bids;
 
     public StoreService(StoreRepository stores, ProductRepository products,
                         StoreProductRepository links, EmployeeRepository employees,
-                        OfferRepository offers) {
+                        OfferRepository offers, MallRepository malls,
+                        StoreTenantRepository joins, BidEventRepository bidEvents,
+                        BidRepository bids) {
         this.stores = stores;
         this.products = products;
         this.links = links;
         this.employees = employees;
         this.offers = offers;
+        this.malls = malls;
+        this.joins = joins;
+        this.bidEvents = bidEvents;
+        this.bids = bids;
     }
 
     public static MallDtos.StoreResponse toResponse(Store s) {
@@ -47,6 +58,67 @@ public class StoreService {
                 ? stores.findByStatus("available", pageable)
                 : stores.findByMallIdAndStatus(mallId, "available", pageable))
                 .map(StoreService::toResponse);
+    }
+
+    public Page<MallDtos.StoreResponse> list(Integer mallId, String status, Pageable pageable) {
+        return stores.search(mallId, normalizeStatus(status), pageable).map(StoreService::toResponse);
+    }
+
+    @Transactional
+    public MallDtos.StoreResponse create(MallDtos.StoreCreateRequest req) {
+        if (!malls.existsById(req.mallId())) throw ApiException.notFound("Mall");
+        String status = normalizeStatus(req.status());
+        if (status == null) status = "available";
+        if ("occupied".equals(status)) {
+            throw ApiException.badRequest("A new store cannot be occupied without a tenant");
+        }
+        var s = new Store();
+        s.setStoreName(req.storeName());
+        s.setMallId(req.mallId());
+        s.setShopNumber(req.shopNumber());
+        s.setFloor(req.floor());
+        s.setAreaSqft(req.areaSqft());
+        s.setListingMedia(req.listingMedia());
+        s.setStatus(status);
+        return toResponse(stores.save(s));
+    }
+
+    @Transactional
+    public MallDtos.StoreResponse update(Integer id, MallDtos.StoreUpdateRequest req) {
+        var s = require(id);
+        if (!malls.existsById(req.mallId())) throw ApiException.notFound("Mall");
+        String status = normalizeStatus(req.status());
+        boolean hasTenant = joins.existsByIdStoreId(id);
+        if (status == null) {
+            status = s.getStatus();
+        } else if ("available".equals(status) && hasTenant) {
+            throw ApiException.conflict("Store has an active tenant");
+        } else if ("occupied".equals(status) && !hasTenant) {
+            throw ApiException.conflict("Store has no tenant");
+        }
+        boolean mallChanged = !Objects.equals(s.getMallId(), req.mallId());
+        s.setStoreName(req.storeName());
+        s.setMallId(req.mallId());
+        s.setShopNumber(req.shopNumber());
+        s.setFloor(req.floor());
+        s.setAreaSqft(req.areaSqft());
+        s.setListingMedia(req.listingMedia());
+        s.setStatus(status);
+        if (mallChanged) employees.updateMallIdByStoreId(req.mallId(), id);
+        return toResponse(s);
+    }
+
+    @Transactional
+    public void delete(Integer id) {
+        require(id);
+        if (joins.existsByIdStoreId(id)) {
+            throw ApiException.conflict("Store has an active rental");
+        }
+        if (bidEvents.existsByIdStoreIdAndStatus(id, "open")) {
+            throw ApiException.conflict("Store has an open bid event");
+        }
+        bids.deleteByStoreId(id);
+        stores.deleteById(id);
     }
 
     public MallDtos.StoreResponse get(Integer id) {
@@ -143,5 +215,14 @@ public class StoreService {
     static MallDtos.OfferResponse toOffer(com.mallhub.entity.DiscountOffer o) {
         return new MallDtos.OfferResponse(o.getId().getStoreId(), o.getId().getOfferId(),
                 o.getStartDate(), o.getEndDate(), o.getDescription());
+    }
+
+    private static String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) return null;
+        String normalized = status.toLowerCase();
+        if (!normalized.equals("available") && !normalized.equals("occupied")) {
+            throw ApiException.badRequest("status must be available or occupied");
+        }
+        return normalized;
     }
 }

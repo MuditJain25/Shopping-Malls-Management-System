@@ -69,7 +69,7 @@ export default function Discover({ user }) {
 
   if(view[0] == 'malldetail' && view[1] !== null){
     return (
-      <MallDetail user={user} mallId={1} navigate={setView} ></MallDetail>
+      <MallDetail user={user} mallId={view[1]} navigate={setView} ></MallDetail>
 
     )
   }

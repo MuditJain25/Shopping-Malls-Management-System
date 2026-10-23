@@ -27,4 +27,12 @@ public interface MallRepository extends JpaRepository<Mall, Integer> {
                                WHERE o.id.executiveId = :executiveId)
             """)
     List<Mall> findByExecutive(@Param("executiveId") Integer executiveId);
+
+    @Query("""
+            SELECT m FROM Mall m
+            WHERE m.latitude IS NOT NULL AND m.longitude IS NOT NULL
+            ORDER BY (m.latitude - :lat) * (m.latitude - :lat)
+                   + (m.longitude - :lng) * (m.longitude - :lng)
+            """)
+    Page<Mall> nearest(@Param("lat") Double lat, @Param("lng") Double lng, Pageable pageable);
 }

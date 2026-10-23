@@ -2,6 +2,7 @@ package com.mallhub.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -15,6 +16,12 @@ public final class MallDtos {
                                String street, String city, String state, String pincode,
                                Float latitude, Float longitude, List<String> contactNumbers,
                                String imageUrl, String description) {
+    }
+
+    public record MallCreateRequest(@NotBlank String city, String state, String street,
+                                    String pincode, Double mallAreaSqft, LocalDate openingDate,
+                                    Float latitude, Float longitude, String imageUrl,
+                                    String description) {
     }
 
     // listing_media is a single image URL string (DESIGN v2.1).
@@ -41,5 +48,15 @@ public final class MallDtos {
     }
 
     public record VisibilityRequest(Boolean toShow) {
+    }
+
+    public record StoreCreateRequest(@NotBlank String storeName, @NotNull Integer mallId,
+                                     String shopNumber, Integer floor, Double areaSqft,
+                                     String status, String listingMedia) {
+    }
+
+    public record StoreUpdateRequest(@NotBlank String storeName, @NotNull Integer mallId,
+                                     String shopNumber, Integer floor, Double areaSqft,
+                                     String status, String listingMedia) {
     }
 }

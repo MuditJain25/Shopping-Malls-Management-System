@@ -2,55 +2,94 @@
 // API CLIENT — Spring Boot Backend Integration
 // ═══════════════════════════════════════════════════════════════
 //
-// This file contains the API client for connecting to your Spring Boot
-// backend. Currently the app uses mock data (see mockData.js), but all
-// the real API calls are written here as commented-out code.
+// API client for the Spring Boot backend. Auth login/signup and mall analytics
+// are still mocked because the backend has no matching endpoints; everything
+// else calls the API directly.
 //
-// To switch to the real backend:
-//   1. Set VITE_API_BASE_URL in your .env file (e.g. http://localhost:8080/api)
-//   2. Uncomment the fetch calls in each function below
-//   3. Remove the mock data return statements
+// Set VITE_API_BASE_URL in .env (default http://localhost:8080/api).
 //
-// The Spring Boot backend should expose these REST endpoints
-// (adjust paths to match your controller mappings):
+// The Spring Boot backend exposes these REST endpoints (mirrors
+// com.mallhub.controller):
 //
-//   POST   /api/auth/login          → { email, password } → { token, user }
-//   POST   /api/auth/signup         → { firstName, lastName, email, password, role } → { token, user }
-//   POST   /api/auth/logout         → void
-//   GET    /api/malls               → Mall[]
-//   GET    /api/malls/{id}          → Mall
-//   GET    /api/malls/{id}/stores   → Store[]
-//   GET    /api/malls/{id}/products/top → Product[] (top-selling)
-//   GET    /api/stores/{id}         → Store
+// ── Auth ────────────────────────────────────────────────────────
+//   POST   /api/auth/google → { id_token } → { token, user }
+//   GET    /api/auth/me → current user
+//   POST   /api/auth/logout → { success }
+//   GET    /api/health → { status }
+//
+// ── Malls ───────────────────────────────────────────────────────
+//   GET    /api/malls?q=&city= → Mall[]
+//   GET    /api/malls/{id} → Mall
+//   GET    /api/malls/{id}/stores → Store[]
+//   GET    /api/malls/nearest?lat=&lng=&limit= → Mall[]
+//   GET    /api/malls/{id}/products/top?storeId= → Product[]
+//   GET    /api/malls/{id}/manager → MallManager|null
+//   GET    /api/malls/{id}/employees?storeId= → Employee[]
+//   GET    /api/malls/{id}/bid-events?status= → BidEvent[]
+//   GET    /api/malls/{id}/offers → Offer[]
+//
+// ── Stores ──────────────────────────────────────────────────────
+//   GET    /api/stores?mallId=&status= → Store[]
+//   GET    /api/stores/available?mallId= → Store[]
+//   GET    /api/stores/{id} → Store
+//   POST   /api/stores → Store 201
+//   PUT    /api/stores/{id} → Store
+//   DELETE /api/stores/{id} → 204
 //   GET    /api/stores/{id}/products → Product[]
-//   PUT    /api/stores/{id}/products/{pid} → toggle to_show
-//   GET    /api/stores/available     → Store[] (available for lease)
-//   GET    /api/bid-events          → BidEvent[]
-//   GET    /api/bid-events/{id}     → BidEvent
+//   POST   /api/stores/{id}/products/{productId} → Product 201
+//   PUT    /api/stores/{id}/products/{pid} → { to_show }
+//   GET    /api/stores/{id}/employees → Employee[]
+//   GET    /api/stores/{id}/offers → Offer[]
+//   POST   /api/stores/{id}/offers → Offer 201
+//   PUT    /api/stores/{id}/offers/{oid} → Offer
+//   DELETE /api/stores/{id}/offers/{oid} → 204
+//
+// ── Products ────────────────────────────────────────────────────
+//   GET    /api/products?search= → Product[]
+//   GET    /api/products/{id} → Product
+//   POST   /api/products → Product 201
+//
+// ── Bid events & bids ───────────────────────────────────────────
+//   GET    /api/bid-events?status= → BidEvent[]
+//   GET    /api/bid-events/{id} → BidEvent
+//   POST   /api/bid-events → BidEvent 201
 //   GET    /api/bid-events/{id}/bids → Bid[]
-//   POST   /api/bid-events/{id}/bids → { userId, bidAmount } → Bid
+//   GET    /api/bids?userId= → Bid[]
+//   POST   /api/bid-events/{id}/bids → Bid
 //   PUT    /api/bid-events/{id}/finalize → finalize winning bid
-//   GET    /api/tenants             → Tenant[]
-//   GET    /api/tenants/{id}        → Tenant
+//
+// ── Tenants ─────────────────────────────────────────────────────
+//   GET    /api/tenants?mallId= → Tenant[]
+//   GET    /api/tenants/{id} → Tenant
+//   POST   /api/tenants → Tenant 201
+//   DELETE /api/tenants/{id} → 204
 //   GET    /api/tenants/{id}/stores → Store[]
 //   GET    /api/tenants/{id}/employees → Employee[]
-//   POST   /api/tenants/{id}/employees → create employee
-//   GET    /api/tenants/{id}/revenue → RevenueInformation[]
-//   POST   /api/tenants/{id}/revenue → submit revenue info
+//   POST   /api/tenants/{id}/employees → Employee 201
 //   GET    /api/tenants/{id}/transactions → FinancialTransaction[]
-//   GET    /api/employees/{id}      → Employee
+//   GET    /api/tenants/{id}/revenue → Revenue[]
+//   POST   /api/tenants/{id}/revenue → Revenue 201
+//
+// ── Employees ───────────────────────────────────────────────────
+//   POST   /api/employees → Employee 201
+//   GET    /api/employees/{id} → Employee
+//   DELETE /api/employees/{id} → 204
 //   GET    /api/employees/{id}/leave-requests → LeaveRequest[]
-//   POST   /api/employees/{id}/leave-requests → apply for leave
+//   POST   /api/employees/{id}/leave-requests → LeaveRequest 201
+//   PATCH  /api/employees/{id}/leave-requests/{rid} → LeaveRequest
+//   GET    /api/leave-requests?storeId=&status= → LeaveRequest[]
 //   GET    /api/employees/{id}/payroll → PayrollRecord[]
 //   GET    /api/employees/{id}/attendance → Attendance[]
 //   POST   /api/employees/{id}/attendance/check-in
 //   POST   /api/employees/{id}/attendance/check-out
-//   GET    /api/malls/{id}/managers → MallManager
-//   GET    /api/managers            → MallManager[]
-//   POST   /api/managers            → create Mall Manager
-//   GET    /api/executives/{id}     → EnterpriseExecutive
+//
+// ── Managers / executives / transactions ────────────────────────
+//   GET    /api/managers → MallManager[]
+//   GET    /api/managers/{id} → MallManager
+//   POST   /api/managers → MallManager 201
+//   GET    /api/executives/{id} → EnterpriseExecutive
 //   GET    /api/executives/{id}/malls → Mall[]
-//   GET    /api/analytics/mall/{id} → { revenue, customers, avgRevenuePerStore, partners }
+//   GET    /api/transactions?mallId= → FinancialTransaction[]
 // ═══════════════════════════════════════════════════════════════
 
 import * as mock from "./mockData.js";
@@ -165,7 +204,9 @@ function normalizeBidEvent(e) {
     store_id: e.storeId ?? e.store_id,
     status: e.status,
     minimum_bid_amount: toNum(e.minimumBidAmount ?? e.minimum_bid_amount ?? 0),
-    minimum_bid_increment: toNum(e.minimumBidIncrement ?? e.minimum_bid_increment ?? 0),
+    minimum_bid_increment: toNum(
+      e.minimumBidIncrement ?? e.minimum_bid_increment ?? 0,
+    ),
     final_allocation: e.finalAllocation ?? e.final_allocation ?? null,
     winningBid: winning ? normalizeBid(winning) : null,
   };
@@ -211,20 +252,27 @@ export async function apiSignup({
 }
 
 export async function apiLogout() {
-  // return apiFetch('/auth/logout', { method: 'POST' });
-  return { success: true };
+  return apiFetch("/auth/logout", { method: "POST" });
+}
+
+export async function apiGoogleLogin(idToken) {
+  return apiFetch("/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ id_token: idToken }),
+  });
+}
+
+export async function apiGetCurrentUser() {
+  return apiFetch("/auth/me");
+}
+
+export async function apiHealth() {
+  return apiFetch("/health");
 }
 
 // ── Malls ──────────────────────────────────────────────────────
-// q / city are matched by the database (see MallRepository.search).
-export async function apiGetMalls({ q, city, page, size } = {}) {
-  const params = new URLSearchParams();
-  if (q) params.set("q", q);
-  if (city) params.set("city", city);
-  if (page != null) params.set("page", String(page));
-  if (size != null) params.set("size", String(size));
-  const qs = params.toString();
-  const data = await apiFetch(`/malls${qs ? `?${qs}` : ""}`);
+export async function apiGetMalls() {
+  const data = await apiFetch("/malls");
   return unwrap(data).map(normalizeMall);
 }
 
@@ -233,7 +281,51 @@ export async function apiGetMallById(id) {
   return normalizeMall(data);
 }
 
+export async function apiCreateMall(mallData) {
+  const body = {
+    city: mallData.city,
+    state: mallData.state,
+    street: mallData.street,
+    pincode: mallData.pincode,
+    mallAreaSqft: mallData.mallAreaSqft ?? mallData.mall_area_sqft ?? null,
+    openingDate: mallData.openingDate ?? mallData.opening_date ?? null,
+    latitude: mallData.latitude ?? null,
+    longitude: mallData.longitude ?? null,
+    imageUrl: mallData.imageUrl ?? mallData.image_url ?? null,
+    description: mallData.description ?? null,
+    // also send snake_case for SNAKE_CASE mappers just in case
+    mall_area_sqft: mallData.mall_area_sqft ?? mallData.mallAreaSqft ?? null,
+    opening_date: mallData.opening_date ?? mallData.openingDate ?? null,
+    image_url: mallData.image_url ?? mallData.imageUrl ?? null,
+  };
+  const data = await apiFetch("/malls", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return normalizeMall(data);
+}
+
+export async function apiGetNearestMalls(lat, lng, limit = 5) {
+  const params = new URLSearchParams({ lat, lng, limit });
+  const data = await apiFetch(`/malls/nearest?${params}`);
+  return unwrap(data).map(normalizeMall);
+}
+
+export async function apiGetMallOffers(mallId) {
+  const data = await apiFetch(`/malls/${mallId}/offers`);
+  return unwrap(data);
+}
+
 // ── Stores ─────────────────────────────────────────────────────
+export async function apiGetStores(mallId, status) {
+  const params = new URLSearchParams();
+  if (mallId) params.set("mallId", mallId);
+  if (status) params.set("status", status);
+  const qs = params.toString() ? `?${params}` : "";
+  const data = await apiFetch(`/stores${qs}`);
+  return unwrap(data).map(normalizeStore);
+}
+
 export async function apiGetStoresByMall(mallId) {
   const data = await apiFetch(`/malls/${mallId}/stores`);
   return unwrap(data).map(normalizeStore);
@@ -258,17 +350,79 @@ export async function apiCreateStore(storeData) {
   return normalizeStore(data);
 }
 
+export async function apiUpdateStore(id, storeData) {
+  const data = await apiFetch(`/stores/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(storeData),
+  });
+  return normalizeStore(data);
+}
+
 export async function apiDeleteStore(id) {
   return apiFetch(`/stores/${id}`, { method: "DELETE" });
 }
 
-// ── Products ───────────────────────────────────────────────────
-export async function apiGetProductsByStore(storeId) {
-  return apiFetch(`/stores/${storeId}/products`);
+export async function apiAttachProduct(storeId, productId, toShow) {
+  return apiFetch(`/stores/${storeId}/products/${productId}`, {
+    method: "POST",
+    ...(toShow === undefined
+      ? {}
+      : { body: JSON.stringify({ to_show: toShow }) }),
+  });
 }
 
-export async function apiGetTopSellingProducts(mallId) {
-  const data = await apiFetch(`/malls/${mallId}/products/top`);
+export async function apiGetStoreOffers(storeId) {
+  const data = await apiFetch(`/stores/${storeId}/offers`);
+  return unwrap(data);
+}
+
+export async function apiCreateOffer(storeId, offerData) {
+  return apiFetch(`/stores/${storeId}/offers`, {
+    method: "POST",
+    body: JSON.stringify(offerData),
+  });
+}
+
+export async function apiUpdateOffer(storeId, offerId, offerData) {
+  return apiFetch(`/stores/${storeId}/offers/${offerId}`, {
+    method: "PUT",
+    body: JSON.stringify(offerData),
+  });
+}
+
+export async function apiDeleteOffer(storeId, offerId) {
+  return apiFetch(`/stores/${storeId}/offers/${offerId}`, {
+    method: "DELETE",
+  });
+}
+
+// ── Products ───────────────────────────────────────────────────
+export async function apiGetProducts(search) {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : "";
+  const data = await apiFetch(`/products${qs}`);
+  return unwrap(data).map(normalizeProduct);
+}
+
+export async function apiGetProductById(id) {
+  return normalizeProduct(await apiFetch(`/products/${id}`));
+}
+
+export async function apiCreateProduct(productData) {
+  const data = await apiFetch("/products", {
+    method: "POST",
+    body: JSON.stringify(productData),
+  });
+  return normalizeProduct(data);
+}
+
+export async function apiGetProductsByStore(storeId) {
+  const data = await apiFetch(`/stores/${storeId}/products`);
+  return unwrap(data).map(normalizeProduct);
+}
+
+export async function apiGetTopSellingProducts(mallId, storeId) {
+  const qs = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
+  const data = await apiFetch(`/malls/${mallId}/products/top${qs}`);
   return unwrap(data).map(normalizeProduct);
 }
 
@@ -286,8 +440,9 @@ export async function apiGetBidEvents(status) {
   return unwrap(data).map(normalizeBidEvent);
 }
 
-export async function apiGetBidEventsByMall(mallId) {
-  const data = await apiFetch(`/malls/${mallId}/bid-events`);
+export async function apiGetBidEventsByMall(mallId, status) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  const data = await apiFetch(`/malls/${mallId}/bid-events${qs}`);
   return unwrap(data).map(normalizeBidEvent);
 }
 
@@ -301,29 +456,35 @@ export async function apiGetBidsByEvent(eventId) {
   return unwrap(data).map(normalizeBid);
 }
 
-// Bid.user_id is an INT foreign key to the User table. The demo sign-in id ("111")
-// is not one, so the real account id is resolved through /auth/me, which in demo
-// mode creates the User row on the first call. Only the "customer" role maps to
-// the User table, so any other role has no valid bidder id.
-const backendUserIds = new Map();
+export async function apiGetBidsByUser(userId) {
+  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const data = await apiFetch(`/bids${qs}`);
+  return unwrap(data).map(normalizeBid);
+}
 
-async function apiResolveUserId(email) {
-  if (!email) throw new Error("Sign in to place a bid");
-  if (backendUserIds.has(email)) return backendUserIds.get(email);
-  const data = await apiFetch(`/auth/me?email=${encodeURIComponent(email)}`);
-  const resolved = data?.user;
-  if (resolved?.role !== "customer" || !Number.isInteger(resolved.id)) {
-    throw new Error("Only customer accounts can place bids");
+// Resolves the backend numeric user id for a signed-in user. Demo ids are
+// placeholders, so look the user up by email via /auth/me (backend creates a
+// customer row on first use) and cache the result per email.
+const backendUserIds = {};
+export async function resolveBackendUserId(user) {
+  if (Number.isInteger(Number(user)) && typeof user !== "object") {
+    return Number(user);
   }
-  backendUserIds.set(email, resolved.id);
-  return resolved.id;
+  const email = user?.email;
+  if (!email) throw new Error("Cannot resolve backend user id without an email");
+  if (backendUserIds[email]) return backendUserIds[email];
+  const res = await apiFetch(`/auth/me?email=${encodeURIComponent(email)}`);
+  const id = res?.user?.id;
+  if (!Number.isInteger(id)) throw new Error("Backend did not return a user id");
+  backendUserIds[email] = id;
+  return id;
 }
 
 export async function apiPlaceBid(eventId, user, bidAmount, bidderName) {
-  const userId = await apiResolveUserId(user?.email);
+  const uid = await resolveBackendUserId(user);
   const data = await apiFetch(`/bid-events/${eventId}/bids`, {
     method: "POST",
-    body: JSON.stringify({ user_id: userId, bid_amount: bidAmount, bidder_name: bidderName }),
+    body: JSON.stringify({ user_id: uid, bid_amount: bidAmount, bidder_name: bidderName }),
   });
   return normalizeBid(data);
 }
@@ -379,8 +540,16 @@ export async function apiGetEmployeesByStore(storeId) {
   return unwrap(data);
 }
 
-// Backend has no POST /employees route; direct-mall (store-less) employees
-// cannot be created yet (see missing-API report).
+// Creates an employee assigned to a store.
+// Store-less employee creation is not supported by the backend yet.
+export async function apiAddStoreEmployee(tenantId, employeeData) {
+  return apiFetch(`/tenants/${tenantId}/employees`, {
+    method: "POST",
+    body: JSON.stringify(employeeData),
+  });
+}
+
+// Backend does not yet support creating store-less employees.
 export async function apiAddEmployee(employeeData) {
   return apiFetch("/employees", {
     method: "POST",
@@ -393,28 +562,15 @@ export async function apiDeleteEmployee(id) {
 }
 
 export async function apiGetRevenueByTenant(tenantId) {
-  // return apiFetch(`/tenants/${tenantId}/revenue`);
-  return mock.getRevenueByTenant(tenantId);
+  const data = await apiFetch(`/tenants/${tenantId}/revenue`);
+  return unwrap(data);
 }
 
-export async function apiSubmitRevenue(
-  tenantId,
-  { description, month, amount },
-) {
-  // return apiFetch(`/tenants/${tenantId}/revenue`, {
-  //   method: 'POST',
-  //   body: JSON.stringify({ description, month, amount }),
-  // });
-  const newRecord = {
-    tenant_id: tenantId,
-    information_id: `ri${Date.now()}`,
-    description,
-    month,
-    amount,
-    submitted_date: new Date().toISOString().split("T")[0],
-  };
-  mock.revenueInfo.push(newRecord);
-  return newRecord;
+export async function apiSubmitRevenue(tenantId, { description }) {
+  return apiFetch(`/tenants/${tenantId}/revenue`, {
+    method: "POST",
+    body: JSON.stringify({ description }),
+  });
 }
 
 export async function apiGetTransactionsByTenant(tenantId) {
@@ -428,8 +584,9 @@ export async function apiGetTransactionsByMall(mallId) {
 }
 
 // ── Mall Employees ─────────────────────────────────────────────
-export async function apiGetEmployeesByMall(mallId) {
-  const data = await apiFetch(`/malls/${mallId}/employees`);
+export async function apiGetEmployeesByMall(mallId, storeId) {
+  const qs = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
+  const data = await apiFetch(`/malls/${mallId}/employees${qs}`);
   return unwrap(data);
 }
 
@@ -448,23 +605,20 @@ export async function apiGetManagerByMall(mallId) {
 }
 
 export async function apiCreateManager(managerData) {
-  // return apiFetch('/managers', {
-  //   method: 'POST',
-  //   body: JSON.stringify(managerData),
-  // });
-  const newMgr = {
-    ...managerData,
-    manager_id: `mm${Date.now()}`,
-    date_joined: new Date().toISOString().split("T")[0],
-  };
-  mock.mallManagers.push(newMgr);
-  return newMgr;
+  return apiFetch("/managers", {
+    method: "POST",
+    body: JSON.stringify(managerData),
+  });
 }
 
 // ── Executives ─────────────────────────────────────────────────
 export async function apiGetExecutiveById(id) {
-  // return apiFetch(`/executives/${id}`);
-  return mock.executives.find((ex) => ex.executive_id === id);
+  return apiFetch(`/executives/${id}`);
+}
+
+export async function apiGetExecutiveMalls(id) {
+  const data = await apiFetch(`/executives/${id}/malls`);
+  return unwrap(data).map(normalizeMall);
 }
 
 // ── Employee Self-Service ──────────────────────────────────────
@@ -483,6 +637,20 @@ export async function apiApplyLeave(empId, { start_date, end_date, reason }) {
   return apiFetch(`/employees/${empId}/leave-requests`, {
     method: "POST",
     body: JSON.stringify({ start_date, end_date, reason }),
+  });
+}
+
+export async function apiGetStoreLeaveRequests(storeId, status) {
+  const params = new URLSearchParams({ storeId });
+  if (status) params.set("status", status);
+  const data = await apiFetch(`/leave-requests?${params}`);
+  return unwrap(data).map((r) => ({ ...r, e_id: r.e_id ?? r.employee_id }));
+}
+
+export async function apiDecideLeave(empId, requestId, status) {
+  return apiFetch(`/employees/${empId}/leave-requests/${requestId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }
 

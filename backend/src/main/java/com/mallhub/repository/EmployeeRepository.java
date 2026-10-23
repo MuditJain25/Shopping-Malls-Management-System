@@ -4,6 +4,7 @@ import com.mallhub.entity.Employee;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,6 +12,10 @@ import java.util.Optional;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     Optional<Employee> findByEmail(String email);
+
+    @Modifying
+    @Query("UPDATE Employee e SET e.mallId = :mallId WHERE e.storeId = :storeId")
+    int updateMallIdByStoreId(@Param("mallId") Integer mallId, @Param("storeId") Integer storeId);
 
     Page<Employee> findByMallId(Integer mallId, Pageable pageable);
 

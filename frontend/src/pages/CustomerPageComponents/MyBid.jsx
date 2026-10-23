@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { Gavel, Trophy, TrendingUp } from 'lucide-react';
 import { PageHeader, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import {
-  apiGetBidEvents,
-  apiGetBidsByEvent,
+  apiGetBidsByUser,
+  apiGetBidEventById,
   apiGetMalls,
   apiGetStoreById,
+  resolveBackendUserId,
 } from '@/lib/api.js';
 
 export default function MyBids({ user }) {
@@ -19,28 +20,33 @@ export default function MyBids({ user }) {
       try {
         setLoading(true);
         setError('');
-        // No "bids by user" endpoint, so fan out per event and filter client-side.
-        const [events, mallList] = await Promise.all([
-          apiGetBidEvents(),
+        const userId = await resolveBackendUserId(user);
+        const [myBids, mallList] = await Promise.all([
+          apiGetBidsByUser(userId),
           apiGetMalls().catch(() => []),
         ]);
         if (cancelled) return;
         const malls = {};
         mallList.forEach((m) => { malls[m.mall_id] = m; });
 
-        const bidsPerEvent = await Promise.all(
-          events.map((e) => apiGetBidsByEvent(e.event_id).catch(() => [])),
+        const eventIds = [...new Set(myBids.map((b) => b.event_id))];
+        const eventEntries = await Promise.all(
+          eventIds.map(async (id) => {
+            try {
+              return [id, await apiGetBidEventById(id)];
+            } catch {
+              return [id, null];
+            }
+          }),
         );
         if (cancelled) return;
+        const events = Object.fromEntries(eventEntries);
 
-        const mine = [];
-        events.forEach((event, i) => {
-          (bidsPerEvent[i] || [])
-            .filter((b) => String(b.user_id) === String(user.id))
-            .forEach((bid) => mine.push({ bid, event }));
-        });
-
-        const storeIds = [...new Set(mine.map(({ event }) => event.store_id))];
+        const storeIds = [
+          ...new Set(
+            Object.values(events).filter(Boolean).map((e) => e.store_id),
+          ),
+        ];
         const storeEntries = await Promise.all(
           storeIds.map(async (id) => {
             try {
@@ -53,8 +59,9 @@ export default function MyBids({ user }) {
         if (cancelled) return;
 
         const stores = Object.fromEntries(storeEntries);
-        setItems(mine.map(({ bid, event }) => {
-          const store = stores[event.store_id] || null;
+        setItems(myBids.map((bid) => {
+          const event = events[bid.event_id] || null;
+          const store = event ? stores[event.store_id] || null : null;
           return { bid, event, store, mall: store ? malls[store.mall_id] : null };
         }));
       } catch (err) {
@@ -64,7 +71,7 @@ export default function MyBids({ user }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [user.id]);
+  }, [user]);
 
   if (loading) return <LoadingSpinner label="Loading your bids..." />;
   if (error) return <ErrorState message={error} />;

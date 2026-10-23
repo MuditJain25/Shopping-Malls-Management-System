@@ -73,4 +73,16 @@ public final class PeopleDtos {
                                       String receiver, String senderType, String receiverType,
                                       LocalDate transactionDate, String remarks) {
     }
+
+    public record StoreLeaveResponse(Integer employeeId, String firstName, String lastName,
+                                     String currentDesignation, Integer requestId,
+                                     LocalDate startDate, LocalDate endDate, String status,
+                                     String reason) {
+    }
+
+    public record RevenueResponse(Integer tenantId, Integer informationId, String description) {
+    }
+
+    public record RevenueCreateRequest(@NotBlank String description) {
+    }
 }

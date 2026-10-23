@@ -1,8 +1,11 @@
 package com.mallhub.controller;
 
+import com.mallhub.dto.MallDtos;
 import com.mallhub.dto.Paging;
 import com.mallhub.service.BidService;
 import com.mallhub.service.MallService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,6 +27,12 @@ public class MallController {
         return Paging.shape(malls.list(q, city, Paging.pageable(page, size, "mallId")), page);
     }
 
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Object create(@Valid @RequestBody MallDtos.MallCreateRequest req) {
+        return malls.create(req);
+    }
+
     @GetMapping("/{id}")
     public Object get(@PathVariable Integer id) {
         return malls.get(id);
@@ -36,9 +45,16 @@ public class MallController {
         return Paging.shape(malls.storesByMall(id, Paging.pageable(page, size, "storeId")), page);
     }
 
+    @GetMapping("/nearest")
+    public Object nearest(@RequestParam Double lat, @RequestParam Double lng,
+                          @RequestParam(defaultValue = "5") Integer limit) {
+        return malls.nearest(lat, lng, limit);
+    }
+
     @GetMapping("/{id}/products/top")
-    public Object topProducts(@PathVariable Integer id) {
-        return malls.topProducts(id);
+    public Object topProducts(@PathVariable Integer id,
+                              @RequestParam(required = false) Integer storeId) {
+        return malls.topProducts(id, storeId);
     }
 
     @GetMapping("/{id}/manager")

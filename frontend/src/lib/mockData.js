@@ -976,7 +976,7 @@ export const attendanceRecords = [
 // ΓöÇΓöÇ Demo Users (for mock sign-in) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const demoUsers = [
   {
-    id: "111",
+    id: 111,
     email: "customer@demo.com",
     password: "demo123",
     role: "customer",
@@ -985,16 +985,16 @@ export const demoUsers = [
     profileId: "u1",
   },
   {
-    id: "222",
+    id: 222,
     email: "tenant@demo.com",
     password: "demo123",
     role: "tenant",
     firstName: "James",
     lastName: "O'Connor",
-    profileId: 1,
+    profileId: 2,
   },
   {
-    id: "333",
+    id: 333,
     email: "shopmgr@demo.com",
     password: "demo123",
     role: "shop_manager",
@@ -1003,7 +1003,7 @@ export const demoUsers = [
     profileId: "e1",
   },
   {
-    id: "444",
+    id: 444,
     email: "mallmgr@demo.com",
     password: "demo123",
     role: "mall_manager",
@@ -1012,7 +1012,7 @@ export const demoUsers = [
     profileId: 1,
   },
   {
-    id: "555",
+    id: 555,
     email: "exec@demo.com",
     password: "demo123",
     role: "executive",
@@ -1021,7 +1021,7 @@ export const demoUsers = [
     profileId: "ex1",
   },
   {
-    id: "666",
+    id: 666,
     email: "employee@demo.com",
     password: "demo123",
     role: "employee",

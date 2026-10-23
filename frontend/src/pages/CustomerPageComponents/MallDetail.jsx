@@ -8,6 +8,7 @@ import {
   apiGetTopSellingProducts,
   apiGetAvailableStores,
   apiGetStoreById,
+  apiGetProductsByStore,
 } from "@/lib/api.js";
 
 export default function MallDetail({ mallId, user,navigate }) {
@@ -60,9 +61,7 @@ export default function MallDetail({ mallId, user,navigate }) {
         setError("");
         const [store, sps] = await Promise.all([
           apiGetStoreById(selectedStore),
-          fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api"}/stores/${selectedStore}/products`)
-            .then((r) => (r.ok ? r.json() : []))
-            .catch(() => []),
+          apiGetProductsByStore(selectedStore).catch(() => []),
         ]);
         if (cancelled) return;
         setStoreProducts({ store, products: sps });
@@ -83,7 +82,7 @@ export default function MallDetail({ mallId, user,navigate }) {
     new Set(topProducts.map((p) => p.category).filter(Boolean)),
   );
   const selectedProducts = storeProducts
-    ? (storeProducts.products?.content || storeProducts.products || [])
+    ? storeProducts.products || []
     : topProducts;
   const visibleCategories = selectedStore
     ? Array.from(
