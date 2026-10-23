@@ -129,6 +129,7 @@ async function apiFetch(path, options = {}) {
 function unwrap(data) {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.content)) return data.content;
+  if (data && Array.isArray(data.items)) return data.items;
   return data ?? [];
 }
 
@@ -396,7 +397,8 @@ export async function apiCreateProduct(productData) {
 }
 
 export async function apiGetProductsByStore(storeId) {
-  return apiFetch(`/stores/${storeId}/products`);
+  const data = await apiFetch(`/stores/${storeId}/products`);
+  return unwrap(data).map(normalizeProduct);
 }
 
 export async function apiGetTopSellingProducts(mallId, storeId) {
