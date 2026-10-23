@@ -129,6 +129,7 @@ async function apiFetch(path, options = {}) {
 function unwrap(data) {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.content)) return data.content;
+  if (data && Array.isArray(data.items)) return data.items;
   return data ?? [];
 }
 

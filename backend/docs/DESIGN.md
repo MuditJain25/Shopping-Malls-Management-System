@@ -1,8 +1,8 @@
 # Shopping Malls Management — Spring Boot Backend — Design (v2.1, Google-Auth revision)
 
 > Status: **DESIGN FROZEN FOR REVIEW — NO CODE YET**
-> Constraints: `frontend/*` untouched. `database/mall_schema.sql` untouched (source of truth).
-> All DB changes below are **planned deltas** to be applied as Flyway migrations, not edits to the original file.
+> Constraints: `frontend/*` untouched. `database/mall_schema.sql` is the complete, runnable schema script (mirrors the enforced Flyway schema).
+> All DB changes below were applied as Flyway migrations; `mall_schema.sql` reflects the final schema in one pass.
 > Ground truth for UI shape: `frontend/src/lib/api.js`, `frontend/src/lib/mockData.js`.
 > This doc supersedes v1.0. It incorporates user decisions dated 2026-09-30.
 
@@ -42,7 +42,7 @@
 **Goals:**
 - 1:1 server coverage for every `api*.js` function + the 5 missing mutations the UI performs by direct array push/splice (`POST /products` + `POST /stores/{id}/products/{pid}`, `POST /tenants`, `DELETE /tenants/{id}`, `DELETE /employees/{id}`, `PATCH /employees/{id}/leave-requests/{rid}`).
 - Google-login auth with role derivation, no passwords.
-- Minimal schema deltas, all listed in §6, none applied to `mall_schema.sql` itself.
+- Minimal schema deltas, all listed in §6, applied via Flyway and reflected in `mall_schema.sql`.
 - `snake_case` JSON matching mock keys so future frontend switch is mechanical.
 
 **Non-goals (MVP):**
@@ -165,7 +165,7 @@ backend/
       ResourceNotFoundException, BadRequestException, ConflictException
   src/main/resources/
     application.yml / application-dev.yml / application-prod.yml
-    db/migration/V1__deltas.sql   // §6 deltas (does NOT touch mall_schema.sql)
+    db/migration/V1__init.sql     // §6 deltas, mirrored into database/mall_schema.sql
     db/migration/V2__seed.sql     // port of mockData.js with INT ids (see §13)
   src/test/java/com/mallhub/
     AuthServiceTest, BidServiceTest (concurrency), AttendanceServiceTest, MallControllerTest
@@ -201,7 +201,7 @@ Rule: no `*Util` for single-use code. MapStruct mappers only where entity↔DTO 
 
 ---
 
-## 6. Planned DB deltas — complete list (apply as `V1__deltas.sql`; `mall_schema.sql` NOT edited)
+## 6. DB deltas — complete list (applied as `V1__init.sql`; mirrored in `database/mall_schema.sql`)
 
 > Each item: reason → exact ALTER. All are additive except type narrowings flagged.
 
@@ -490,13 +490,13 @@ Demo placeholder logins (work in BOTH modes; in `demo` mode no Google token need
 
 **2-day demo slice first (profile `demo`, auth disabled):** scaffold + health → malls/stores/products + seed → tenants/employees/managers/executives + stub auth → bid events/bids (read + place + finalize) + offers/transactions read. Skip: Google verifier wiring (stub only), revenue (deferred), analytics, strict role tests. Demo run: `SPRING_PROFILES_ACTIVE=demo mvn spring-boot:run`, login with any §13 placeholder email.
 
-1. **Scaffold:** `pom.xml`, `application.yml`, `V1__deltas.sql` (§6), `GlobalExceptionHandler`, `SecurityConfig` (demo-permit + real guard behind `!demo`), `GET /api/health` → verify boot + Flyway validate.
+1. **Scaffold:** `pom.xml`, `application.yml`, `V1__init.sql` (§6), `GlobalExceptionHandler`, `SecurityConfig` (demo-permit + real guard behind `!demo`), `GET /api/health` → verify boot + Flyway validate.
 2. **Core:** `Mall/Store/Product/StoreProduct` entities+repos+services+controllers + `V2__seed.sql` (malls/stores/products) → `curl` paged + unpaged lists.
 3. **People:** `Tenant/Employee/Manager/Executive/Oversees/User` + Google exchange + role derivation → verify each demo Gmail gets correct role.
 4. **Transactions:** `Bid/BidEvent` (locking test), `Attendance/Leave/Payroll`, `Offers` (full CRUD), `Transactions` → concurrency + validation tests. Revenue excluded (pending P2).
 5. **Parity check:** script comparing `mockData.js` (mapped through INT translation table) vs `GET /api/*` responses; OpenAPI published.
 
-**Success criteria:** boot clean, Flyway `validate` passes against unmodified `mall_schema.sql` + `V1` deltas, all §9 endpoints return `snake_case` JSON matching DTOs, `POST /bid-events/{id}/bids` rejects low bids under concurrent load, Google exchange returns correct role for each seeded email, paged + unpaged list shapes both verified.
+**Success criteria:** boot clean, Flyway `validate` passes and `database/mall_schema.sql` matches the post-migration schema, all §9 endpoints return `snake_case` JSON matching DTOs, `POST /bid-events/{id}/bids` rejects low bids under concurrent load, Google exchange returns correct role for each seeded email, paged + unpaged list shapes both verified.
 
 ---
 

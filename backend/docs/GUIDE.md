@@ -41,7 +41,7 @@ Anything else = Google ID-token verification + app JWT required.
 | 6 | `controller/StoreController.java` | Typical controller: full CRUD + sub-resources |
 | 7 | `service/BidService.java` | The hardest logic (locking, bid math) — read after the above |
 | 8 | `service/AuthService.java` + `security/` | Login + roles |
-| 9 | `resources/db/migration/V1__init.sql` | The real schema (superset of `database/mall_schema.sql`) |
+| 9 | `resources/db/migration/V1__init.sql` | The real schema; `database/mall_schema.sql` mirrors it |
 | 10 | `resources/db/migration/V2__seed.sql` | Demo data and the `m1→1, s1→1…` ID map |
 
 Full inventory: **20 entities, 20 repositories, 9 services, 11 controllers,
