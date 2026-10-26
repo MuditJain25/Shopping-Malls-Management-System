@@ -78,6 +78,12 @@ public class StoreController {
         return Map.of("success", true);
     }
 
+    @DeleteMapping("/{id}/products/{pid}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void detachProduct(@PathVariable Integer id, @PathVariable Integer pid) {
+        stores.detachProduct(id, pid);
+    }
+
     @GetMapping("/{id}/employees")
     public Object employees(@PathVariable Integer id,
                             @RequestParam(required = false) Integer page,

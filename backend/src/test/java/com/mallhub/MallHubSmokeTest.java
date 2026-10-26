@@ -105,6 +105,36 @@ class MallHubSmokeTest {
     }
 
     @Test
+    void detachProductRemovesLinkButKeepsProduct() throws Exception {
+        var created = mvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"product_name":"Smoke Test Detachable","category":"Books","price":12}"""))
+                .andExpect(status().isCreated())
+                .andReturn();
+        int pid = json.readTree(created.getResponse().getContentAsString()).get("product_id").asInt();
+
+        mvc.perform(post("/api/stores/1/products/" + pid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(delete("/api/stores/1/products/" + pid))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/stores/1/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.product_id == " + pid + ")]").isEmpty());
+
+        mvc.perform(get("/api/products/" + pid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.product_name").value("Smoke Test Detachable"));
+
+        mvc.perform(delete("/api/stores/1/products/" + pid))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void storesFilterByMallAndStatus() throws Exception {
         mvc.perform(get("/api/stores").param("mallId", "1").param("status", "available"))
                 .andExpect(status().isOk())

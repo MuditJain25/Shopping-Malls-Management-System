@@ -117,7 +117,7 @@ Each is an interface extending `JpaRepository<Entity, KeyType>`; method names be
 |---|---|
 | `AuthService` | `exchange` → verify-or-stub (§8), `resolve` → fixed role precedence executive → mall_manager → tenant → employee/shop_manager → customer; `shop_manager` = employee whose designation is `Shop Manager`; unknown email auto-creates a `customer` User |
 | `MallService` | `list(q, city)` search filter; `topProducts` = `to_show` links joined to product+store |
-| `StoreService` | `attachProduct` links an **existing** catalog product to a store (`404` unknown product, `409` if the pair already exists, `to_show` defaults `false`); product creation is separate (`POST /api/products`); `setVisibility` flips only; offers use per-store `MAX+1` ids |
+| `StoreService` | `attachProduct` links an **existing** catalog product to a store (`404` unknown product, `409` if the pair already exists, `to_show` defaults `false`); product creation is separate (`POST /api/products`); `setVisibility` flips only; `detachProduct` removes only the link (`404` if absent); offers use per-store `MAX+1` ids |
 | `BidService` | Place-bid math + locking; finalize guard (see §7 trace 2) |
 | `TenantService` | `create` assigns stores (status → `occupied` + join rows); `delete` frees stores (→ `available` only if no other tenant holds them); transactions match `sender = business_name` |
 | `EmployeeService` | Leave: `end ≥ start`, only `pending` decidable, decision is `approved`/`rejected`; attendance: check-in creates today's row, second check-in → 409, check-out needs a check-in, second check-out → 409 |

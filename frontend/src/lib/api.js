@@ -372,6 +372,12 @@ export async function apiAttachProduct(storeId, productId, toShow) {
   });
 }
 
+export async function apiDetachProduct(storeId, productId) {
+  return apiFetch(`/stores/${storeId}/products/${productId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function apiGetStoreOffers(storeId) {
   const data = await apiFetch(`/stores/${storeId}/offers`);
   return unwrap(data);

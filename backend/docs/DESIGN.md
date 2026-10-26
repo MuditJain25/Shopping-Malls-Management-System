@@ -348,6 +348,7 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | GET | `/stores/{id}/products` | `?page…` | `Product[]` | auth | includes `to_show` |
 | POST | `/stores/{id}/products/{pid}` | `{to_show}` | `Product 201` | auth | links an **existing** catalog product; `409` if already linked |
 | PUT | `/stores/{id}/products/{pid}` | `{to_show}` | `{success:true}` | auth | star toggle |
+| DELETE | `/stores/{id}/products/{pid}` | — | `204` | auth | removes the store↔product link only; catalog product and other stores' links stay; `404` if not linked |
 | GET | `/stores/{id}/employees` | — | `Employee[]` | tenant,mall_manager | |
 | GET | `/stores/{id}/offers` | — | `Offer[]` | permit | |
 | POST | `/stores/{id}/offers` | OfferCreate | `Offer 201` | tenant,mall_manager | |

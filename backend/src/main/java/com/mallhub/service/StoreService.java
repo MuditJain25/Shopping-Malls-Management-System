@@ -170,6 +170,14 @@ public class StoreService {
         link.setToShow(toShow != null && toShow);
     }
 
+    @Transactional
+    public void detachProduct(Integer storeId, Integer productId) {
+        require(storeId);
+        var id = new StoreProduct.Id(storeId, productId);
+        if (!links.existsById(id)) throw ApiException.notFound("Store product");
+        links.deleteById(id);
+    }
+
     public Page<PeopleDtos.EmployeeResponse> employeesByStore(Integer storeId, Pageable pageable) {
         require(storeId);
         return employees.findByStoreId(storeId, pageable).map(EmployeeService::toResponse);
