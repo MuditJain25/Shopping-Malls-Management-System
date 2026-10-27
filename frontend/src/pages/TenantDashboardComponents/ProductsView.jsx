@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Star, Plus, Link2 } from "lucide-react";
+import { Star, Plus, Link2, Trash2 } from "lucide-react";
 import { PageHeader, Badge, EmptyState } from "@/components/ui/index.jsx";
 import Modal from "@/components/ui/Modal.jsx";
 import {
   apiGetProducts,
   apiCreateProduct,
   apiAttachProduct,
+  apiDetachProduct,
   apiGetProductsByStore,
   apiToggleProductVisibility,
 } from "@/lib/api";
@@ -31,6 +32,9 @@ export default function ProductsView({ stores, role }) {
   });
   const [savingProduct, setSavingProduct] = useState(false);
   const [productError, setProductError] = useState("");
+  const [productToUnlink, setProductToUnlink] = useState(null);
+  const [unlinkingProduct, setUnlinkingProduct] = useState(false);
+  const [unlinkError, setUnlinkError] = useState("");
   const [tenantProducts, setTenantProducts] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -292,6 +296,47 @@ export default function ProductsView({ stores, role }) {
     }
   };
 
+  const handleUnlinkProduct = async () => {
+    if (!store || !productToUnlink) return;
+
+    setUnlinkingProduct(true);
+    setUnlinkError("");
+
+    try {
+      if (isShopManager) {
+        const index = storeProducts.findIndex(
+          (item) =>
+            String(item.store_id) === String(store.store_id) &&
+            String(item.product_id) === String(productToUnlink.product_id),
+        );
+
+        if (index !== -1) {
+          storeProducts.splice(index, 1);
+        }
+
+        setRefresh((r) => r + 1);
+      } else {
+        await apiDetachProduct(store.store_id, productToUnlink.product_id);
+
+        setTenantProducts((currentProducts) =>
+          currentProducts.filter(
+            (product) =>
+              String(product.product_id) !== String(productToUnlink.product_id),
+          ),
+        );
+      }
+
+      setProductToUnlink(null);
+      setUnlinkError("");
+    } catch (error) {
+      setUnlinkError(
+        error.message || "Failed to unlink the product from this store.",
+      );
+    } finally {
+      setUnlinkingProduct(false);
+    }
+  };
+
   if (!store)
     return (
       <EmptyState title="No stores" message="You don't have any stores yet." />
@@ -357,19 +402,37 @@ export default function ProductsView({ stores, role }) {
               </button>
             </div>
             <div className="p-3">
-              <p className="text-xs text-slate-400">{product.category}</p>
-              <h3 className="font-medium text-slate-800 text-sm">
-                {product.product_name}
-              </h3>
               <div className="flex items-center justify-between">
-                <p className="font-semibold text-brand-600 text-sm">
-                  ${product.price.toFixed(2)}
-                </p>
+                <p className="text-xs text-slate-400">{product.category}</p>
+
                 {product.to_show ? (
                   <Badge variant="warning">Top Selling</Badge>
                 ) : (
                   <Badge variant="neutral">Hidden</Badge>
                 )}
+              </div>
+
+              <h3 className="font-medium text-slate-800 text-sm">
+                {product.product_name}
+              </h3>
+
+              <div className="flex items-center justify-between mt-1">
+                <p className="font-semibold text-brand-600 text-sm">
+                  ${product.price.toFixed(2)}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductToUnlink(product);
+                    setUnlinkError("");
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
+                  title="Remove product from this store"
+                >
+                  <Trash2 size={11} />
+                  Delete
+                </button>
               </div>
             </div>
           </div>
@@ -558,6 +621,66 @@ export default function ProductsView({ stores, role }) {
               </button>
             </>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!productToUnlink}
+        onClose={() => {
+          if (!unlinkingProduct) {
+            setProductToUnlink(null);
+            setUnlinkError("");
+          }
+        }}
+        title="Delete Product"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Are you sure you want to remove{" "}
+            <span className="font-semibold text-slate-800">
+              {productToUnlink?.product_name}
+            </span>{" "}
+            from{" "}
+            <span className="font-semibold text-slate-800">
+              {store.store_name}
+            </span>
+            ?
+          </p>
+
+          <p className="text-sm text-slate-500">
+            This removes the product from this store only. The product will
+            remain in the catalog and can be linked to this store again later.
+          </p>
+
+          {unlinkError && (
+            <p className="text-sm text-red-600" role="alert">
+              {unlinkError}
+            </p>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              disabled={unlinkingProduct}
+              onClick={() => {
+                setProductToUnlink(null);
+                setUnlinkError("");
+              }}
+              className="btn-secondary flex-1 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              disabled={unlinkingProduct}
+              onClick={handleUnlinkProduct}
+              className="inline-flex flex-1 items-center justify-center rounded-lg bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-200 disabled:opacity-60"
+            >
+              {unlinkingProduct ? "Deleting..." : "Delete"}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

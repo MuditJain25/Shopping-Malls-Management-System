@@ -87,7 +87,23 @@ export default function TenantDashboard({ role = "tenant" }) {
     return <Overview role={role} stores={activeStores} tenantId={tenantId} />;
   }
   if (pageKey === "stores" || pageKey === "store") {
-    return <StoresView stores={activeStores} role={role} />;
+    return (
+      <StoresView
+        stores={activeStores}
+        role={role}
+        onStoreUpdated={(updatedStore) => {
+          if (isShopManager) return;
+
+          setTenantStores((currentStores) =>
+            currentStores.map((store) =>
+              String(store.store_id) === String(updatedStore.store_id)
+                ? { ...store, ...updatedStore }
+                : store,
+            ),
+          );
+        }}
+      />
+    );
   }
   if (pageKey === "products") {
     return <ProductsView stores={activeStores} role={role} />;
