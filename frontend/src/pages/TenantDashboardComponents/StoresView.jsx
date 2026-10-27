@@ -3,12 +3,11 @@ import { Building2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/index.jsx";
 import Modal from "@/components/ui/Modal";
 import { apiGetMallById, apiUpdateStore } from "@/lib/api";
-import { getMallById } from "@/lib/mockData.js";
 
 export default function StoresView({ stores, role, onStoreUpdated }) {
   const isShopManager = role === "shop_manager";
 
-  const [tenantMalls, setTenantMalls] = useState({});
+  const [malls, setMalls] = useState({});
   const [editingStore, setEditingStore] = useState(null);
   const [editForm, setEditForm] = useState({
     store_name: "",
@@ -114,7 +113,7 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
   };
 
   useEffect(() => {
-    if (isShopManager || stores.length === 0) return;
+    if (stores.length === 0) return;
 
     let cancelled = false;
 
@@ -132,7 +131,7 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
     )
       .then((entries) => {
         if (!cancelled) {
-          setTenantMalls(Object.fromEntries(entries));
+          setMalls(Object.fromEntries(entries));
         }
       })
       .catch((error) => {
@@ -144,16 +143,16 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
     return () => {
       cancelled = true;
     };
-  }, [isShopManager, stores]);
+  }, [stores]);
 
   return (
     <div>
       <PageHeader title="My Stores" subtitle="All stores you operate" />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {displayStores.map((store) => {
-          const mall = isShopManager
-            ? getMallById(store.mall_id)
-            : tenantMalls[String(store.mall_id)];
+          const mall = malls[String(store.mall_id)];
+
           return (
             <div key={store.store_id} className="card overflow-hidden">
               <img
@@ -161,6 +160,7 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
                 alt={store.store_name}
                 className="w-full h-32 object-cover"
               />
+
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3 mb-1">
                   <h3 className="font-semibold text-slate-900 text-sm">
@@ -178,10 +178,12 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
                     </button>
                   )}
                 </div>
+
                 <div className="flex items-center gap-1 text-xs text-slate-500 mb-3">
                   <Building2 size={12} /> {mall?.city}, {mall?.state} · Shop{" "}
                   {store.shop_number}
                 </div>
+
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="p-2.5 rounded-lg bg-slate-50">
                     <p className="text-slate-400 text-xs">Floor</p>
@@ -189,6 +191,7 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
                       Floor {store.floor}
                     </p>
                   </div>
+
                   <div className="p-2.5 rounded-lg bg-slate-50">
                     <p className="text-slate-400 text-xs">Area</p>
                     <p className="font-medium text-slate-800 text-sm">
@@ -201,6 +204,7 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
           );
         })}
       </div>
+
       <Modal
         open={!!editingStore}
         onClose={() => {

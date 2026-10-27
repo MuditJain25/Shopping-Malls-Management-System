@@ -12,20 +12,14 @@ import {
   apiAddStoreEmployee,
   apiDeleteEmployee,
   apiGetEmployeesByStore,
+  apiGetAttendance,
 } from "@/lib/api";
-import {
-  getEmployeesByStore,
-  employees,
-  attendanceRecords,
-} from "@/lib/mockData.js";
 
-export default function EmployeesView({ stores, role, profileId }) {
-  const isShopManager = role === "shop_manager";
-
+export default function EmployeesView({ stores, profileId }) {
   const [showAdd, setShowAdd] = useState(false);
   const [addError, setAddError] = useState("");
   const [selectedStore, setSelectedStore] = useState(stores[0]?.store_id || "");
-  const [tenantEmployees, setTenantEmployees] = useState([]);
+  const [storeEmployees, setStoreEmployees] = useState([]);
   const [newEmp, setNewEmp] = useState({
     first_name: "",
     last_name: "",
@@ -34,7 +28,6 @@ export default function EmployeesView({ stores, role, profileId }) {
     current_designation: "",
     phone_number: "",
   });
-  const [refresh, setRefresh] = useState(0);
   const [empToRemove, setEmpToRemove] = useState(null);
   const [removeError, setRemoveError] = useState("");
   const [empForDetails, setEmpForDetails] = useState(null);
@@ -42,10 +35,16 @@ export default function EmployeesView({ stores, role, profileId }) {
 
   const store = stores.find((s) => s.store_id === selectedStore) || stores[0];
   const storeId = store?.store_id;
+
   useEffect(() => {
-    if (isShopManager || storeId == null) return;
+    if (storeId == null) {
+      setStoreEmployees([]);
+      return;
+    }
 
     let cancelled = false;
+
+    setStoreEmployees([]);
 
     apiGetEmployeesByStore(storeId)
       .then((data) => {
@@ -54,60 +53,41 @@ export default function EmployeesView({ stores, role, profileId }) {
             ? data
             : (data?.content ?? data?.items ?? []);
 
-          setTenantEmployees(employeeList);
+          setStoreEmployees(employeeList);
         }
       })
       .catch((error) => {
         if (!cancelled) {
-          console.error("Failed to load tenant employees:", error);
+          console.error("Failed to load store employees:", error);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isShopManager, storeId]);
-
-  const emps = !store
-    ? []
-    : isShopManager
-      ? getEmployeesByStore(store.store_id)
-      : tenantEmployees;
+  }, [storeId]);
 
   const handleAdd = async () => {
     if (!store) return;
 
     setAddError("");
 
+    if (profileId == null) {
+      setAddError("Unable to identify your profile. Please sign in again.");
+      return;
+    }
+
     try {
-      if (isShopManager) {
-        employees.push({
-          ...newEmp,
-          employee_id: `e${Date.now()}`,
-          store_id: store.store_id,
-          mall_id: store.mall_id,
-          date_of_joining: new Date().toISOString().split("T")[0],
-          base_salary: parseFloat(newEmp.base_salary) || 0,
-        });
+      const createdEmployee = await apiAddStoreEmployee(profileId, {
+        ...newEmp,
+        base_salary: parseFloat(newEmp.base_salary) || 0,
+        store_id: store.store_id,
+      });
 
-        setRefresh((r) => r + 1);
-      } else {
-        if (profileId == null) {
-          setAddError("Unable to identify the tenant. Please sign in again.");
-          return;
-        }
-
-        const createdEmployee = await apiAddStoreEmployee(profileId, {
-          ...newEmp,
-          base_salary: parseFloat(newEmp.base_salary) || 0,
-          store_id: store.store_id,
-        });
-
-        setTenantEmployees((currentEmployees) => [
-          ...currentEmployees,
-          createdEmployee,
-        ]);
-      }
+      setStoreEmployees((currentEmployees) => [
+        ...currentEmployees,
+        createdEmployee,
+      ]);
 
       setShowAdd(false);
       setNewEmp({
@@ -119,7 +99,7 @@ export default function EmployeesView({ stores, role, profileId }) {
         phone_number: "",
       });
     } catch (error) {
-      setAddError(error.message || "Failed to add employee. Please try again");
+      setAddError(error.message || "Failed to add employee. Please try again.");
     }
   };
 
@@ -129,40 +109,31 @@ export default function EmployeesView({ stores, role, profileId }) {
     setRemoveError("");
 
     try {
-      if (isShopManager) {
-        const idx = employees.findIndex(
-          (e) => e.employee_id === empToRemove.employee_id,
-        );
+      await apiDeleteEmployee(empToRemove.employee_id);
 
-        if (idx >= 0) employees.splice(idx, 1);
-
-        setRefresh((r) => r + 1);
-      } else {
-        await apiDeleteEmployee(empToRemove.employee_id);
-
-        setTenantEmployees((currentEmployees) =>
-          currentEmployees.filter(
-            (employee) =>
-              String(employee.employee_id) !== String(empToRemove.employee_id),
-          ),
-        );
-      }
+      setStoreEmployees((currentEmployees) =>
+        currentEmployees.filter(
+          (employee) =>
+            String(employee.employee_id) !== String(empToRemove.employee_id),
+        ),
+      );
 
       setEmpToRemove(null);
     } catch (error) {
       setRemoveError(
-        error.message || "Failed to remove employee. Please Try again.",
+        error.message || "Failed to remove employee. Please try again.",
       );
     }
   };
 
-  if (!store)
+  if (!store) {
     return (
       <EmptyState title="No stores" message="You don't have any stores yet." />
     );
+  }
 
   return (
-    <div key={refresh}>
+    <div>
       <PageHeader
         title="Employees"
         subtitle="Track employees under your stores"
@@ -175,13 +146,18 @@ export default function EmployeesView({ stores, role, profileId }) {
           </button>
         }
       />
+
       {stores.length > 1 && (
         <div className="flex gap-2 mb-6 flex-wrap">
           {stores.map((s) => (
             <button
               key={s.store_id}
               onClick={() => setSelectedStore(s.store_id)}
-              className={`px-3 py-1.5 rounded-lg text-sm ${selectedStore === s.store_id ? "bg-brand-600 text-white" : "bg-white border border-slate-300 text-slate-600"}`}
+              className={`px-3 py-1.5 rounded-lg text-sm ${
+                selectedStore === s.store_id
+                  ? "bg-brand-600 text-white"
+                  : "bg-white border border-slate-300 text-slate-600"
+              }`}
             >
               {s.store_name}
             </button>
@@ -231,7 +207,7 @@ export default function EmployeesView({ stores, role, profileId }) {
               label: "Base Salary",
               render: (e) => (
                 <span className="font-medium text-slate-800">
-                  ${e.base_salary.toLocaleString()}
+                  ${Number(e.base_salary ?? 0).toLocaleString()}
                 </span>
               ),
             },
@@ -247,7 +223,10 @@ export default function EmployeesView({ stores, role, profileId }) {
               label: "",
               render: (e) => (
                 <button
-                  onClick={() => setEmpToRemove(e)}
+                  onClick={() => {
+                    setEmpToRemove(e);
+                    setRemoveError("");
+                  }}
                   className="p-1.5 rounded-lg text-red-500 hover:bg-red-50"
                   title="Remove employee"
                 >
@@ -256,14 +235,17 @@ export default function EmployeesView({ stores, role, profileId }) {
               ),
             },
           ]}
-          rows={emps}
+          rows={storeEmployees}
           emptyMessage="No employees hired for this store yet."
         />
       </div>
 
       <Modal
         open={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={() => {
+          setShowAdd(false);
+          setAddError("");
+        }}
         title="Add Employee"
         size="md"
       >
@@ -273,6 +255,7 @@ export default function EmployeesView({ stores, role, profileId }) {
               {addError}
             </p>
           )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">First Name</label>
@@ -284,6 +267,7 @@ export default function EmployeesView({ stores, role, profileId }) {
                 }
               />
             </div>
+
             <div>
               <label className="label">Last Name</label>
               <input
@@ -295,6 +279,7 @@ export default function EmployeesView({ stores, role, profileId }) {
               />
             </div>
           </div>
+
           <div>
             <label className="label">Email</label>
             <input
@@ -304,6 +289,7 @@ export default function EmployeesView({ stores, role, profileId }) {
               onChange={(e) => setNewEmp({ ...newEmp, email: e.target.value })}
             />
           </div>
+
           <div>
             <label className="label">Phone Number</label>
             <input
@@ -314,6 +300,7 @@ export default function EmployeesView({ stores, role, profileId }) {
               }
             />
           </div>
+
           <div>
             <label className="label">Designation</label>
             <input
@@ -325,10 +312,12 @@ export default function EmployeesView({ stores, role, profileId }) {
               placeholder="e.g. Sales Associate"
             />
           </div>
+
           <div>
             <label className="label">Base Salary ($)</label>
             <input
               type="number"
+              min="0"
               className="input"
               value={newEmp.base_salary}
               onChange={(e) =>
@@ -336,6 +325,7 @@ export default function EmployeesView({ stores, role, profileId }) {
               }
             />
           </div>
+
           <button onClick={handleAdd} className="btn-primary w-full">
             Add Employee
           </button>
@@ -379,19 +369,24 @@ export default function EmployeesView({ stores, role, profileId }) {
             </button>
           </div>
 
-          {employeeTab === "attendance" ? (
-            <EmployeeAttendanceRecords
-              employeeId={empForDetails?.employee_id}
-            />
-          ) : (
-            <PayrollRecords employeeId={empForDetails?.employee_id} />
-          )}
+          <div className="h-64 min-h-64">
+            {employeeTab === "attendance" ? (
+              <EmployeeAttendanceRecords
+                employeeId={empForDetails?.employee_id}
+              />
+            ) : (
+              <PayrollRecords employeeId={empForDetails?.employee_id} />
+            )}
+          </div>
         </div>
       </Modal>
 
       <Modal
         open={!!empToRemove}
-        onClose={() => setEmpToRemove(null)}
+        onClose={() => {
+          setEmpToRemove(null);
+          setRemoveError("");
+        }}
         title="Remove Employee"
         size="sm"
       >
@@ -401,6 +396,7 @@ export default function EmployeesView({ stores, role, profileId }) {
               {removeError}
             </p>
           )}
+
           <p className="text-sm text-slate-600">
             Are you sure you want to remove{" "}
             <span className="font-medium text-slate-800">
@@ -408,13 +404,18 @@ export default function EmployeesView({ stores, role, profileId }) {
             </span>{" "}
             from this store?
           </p>
+
           <div className="flex gap-3">
             <button
-              onClick={() => setEmpToRemove(null)}
+              onClick={() => {
+                setEmpToRemove(null);
+                setRemoveError("");
+              }}
               className="btn-secondary flex-1"
             >
               Cancel
             </button>
+
             <button
               onClick={handleRemove}
               className="btn bg-red-600 text-white hover:bg-red-700 flex-1 px-4 py-2 text-sm font-semibold rounded-lg"
@@ -429,9 +430,63 @@ export default function EmployeesView({ stores, role, profileId }) {
 }
 
 function EmployeeAttendanceRecords({ employeeId }) {
-  if (!employeeId) return null;
-  const records = attendanceRecords.filter((a) => a.e_id === employeeId);
-  if (records.length === 0)
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (employeeId == null) {
+      setRecords([]);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    setLoading(true);
+    setError("");
+    setRecords([]);
+
+    apiGetAttendance(employeeId)
+      .then((data) => {
+        if (!cancelled) {
+          setRecords(
+            Array.isArray(data) ? data : (data?.content ?? data?.items ?? []),
+          );
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load employee attendance:", error);
+          setError(error.message || "Failed to load attendance records.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId]);
+
+  if (loading) {
+    return (
+      <p className="py-6 text-center text-sm text-slate-500">
+        Loading attendance records...
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p className="text-sm text-red-600" role="alert">
+        {error}
+      </p>
+    );
+  }
+
+  if (records.length === 0) {
     return (
       <EmptyState
         icon={Clock}
@@ -439,30 +494,39 @@ function EmployeeAttendanceRecords({ employeeId }) {
         message="This employee has no attendance history yet."
       />
     );
+  }
+
   return (
-    <div className="space-y-2 max-h-80 overflow-y-auto">
-      {records.map((a) => (
+    <div className="h-full space-y-2 overflow-y-auto">
+      {records.map((record) => (
         <div
-          key={a.attendance_id}
+          key={
+            record.attendance_id ??
+            `${record.employee_id ?? record.e_id}-${record.date}`
+          }
           className="flex items-center justify-between p-3 rounded-lg bg-slate-50"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-brand-100 flex items-center justify-center">
               <Calendar size={16} className="text-brand-600" />
             </div>
+
             <div>
-              <p className="text-sm font-medium text-slate-800">{a.date}</p>
+              <p className="text-sm font-medium text-slate-800">
+                {record.date}
+              </p>
               <p className="text-xs text-slate-400">
-                {a.check_in_time || "—"} → {a.check_out_time || "—"}
+                {record.check_in_time || "—"} → {record.check_out_time || "—"}
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-3">
-            {a.check_in_time && a.check_out_time ? (
+            {record.check_in_time && record.check_out_time ? (
               <span className="text-sm font-medium text-slate-700">
                 {(() => {
-                  const [ih, im] = a.check_in_time.split(":").map(Number);
-                  const [oh, om] = a.check_out_time.split(":").map(Number);
+                  const [ih, im] = record.check_in_time.split(":").map(Number);
+                  const [oh, om] = record.check_out_time.split(":").map(Number);
                   const mins = oh * 60 + om - (ih * 60 + im);
                   return (mins / 60).toFixed(1);
                 })()}
@@ -471,7 +535,8 @@ function EmployeeAttendanceRecords({ employeeId }) {
             ) : (
               <span className="text-xs text-slate-400">—</span>
             )}
-            {a.check_out_time ? (
+
+            {record.check_out_time ? (
               <Badge variant="success">Complete</Badge>
             ) : (
               <Badge variant="warning">In Progress</Badge>

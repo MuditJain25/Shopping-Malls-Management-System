@@ -10,17 +10,8 @@ import {
   apiGetProductsByStore,
   apiToggleProductVisibility,
 } from "@/lib/api";
-import {
-  getProductsByStore,
-  products,
-  storeProducts,
-  productImages,
-} from "@/lib/mockData.js";
 
-export default function ProductsView({ stores, role }) {
-  const isShopManager = role === "shop_manager";
-
-  const [refresh, setRefresh] = useState(0);
+export default function ProductsView({ stores }) {
   const [selectedStore, setSelectedStore] = useState(stores[0]?.store_id || "");
   const [showAdd, setShowAdd] = useState(false);
   const [activeProductTab, setActiveProductTab] = useState("existing");
@@ -35,7 +26,7 @@ export default function ProductsView({ stores, role }) {
   const [productToUnlink, setProductToUnlink] = useState(null);
   const [unlinkingProduct, setUnlinkingProduct] = useState(false);
   const [unlinkError, setUnlinkError] = useState("");
-  const [tenantProducts, setTenantProducts] = useState([]);
+  const [storeProducts, setStoreProducts] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -44,17 +35,21 @@ export default function ProductsView({ stores, role }) {
 
   const store = stores.find((s) => s.store_id === selectedStore) || stores[0];
   const storeId = store?.store_id;
+
   useEffect(() => {
-    if (isShopManager || storeId == null) return;
+    if (storeId == null) {
+      setStoreProducts([]);
+      return;
+    }
 
     let cancelled = false;
 
-    setTenantProducts([]);
+    setStoreProducts([]);
 
     apiGetProductsByStore(storeId)
       .then((data) => {
         if (!cancelled) {
-          setTenantProducts(data);
+          setStoreProducts(data);
         }
       })
       .catch((error) => {
@@ -66,10 +61,10 @@ export default function ProductsView({ stores, role }) {
     return () => {
       cancelled = true;
     };
-  }, [isShopManager, storeId]);
+  }, [storeId]);
 
   useEffect(() => {
-    if (isShopManager || !showAdd || activeProductTab !== "existing") {
+    if (!showAdd || activeProductTab !== "existing") {
       setCatalogLoading(false);
       return;
     }
@@ -104,54 +99,23 @@ export default function ProductsView({ stores, role }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [isShopManager, showAdd, activeProductTab, catalogSearch]);
-
-  const storeProductList = !store
-    ? []
-    : isShopManager
-      ? getProductsByStore(store.store_id)
-      : tenantProducts;
+  }, [showAdd, activeProductTab, catalogSearch]);
 
   const alreadyLinkedIds = new Set(
-    (isShopManager
-      ? storeProducts.filter(
-          (item) => String(item.store_id) === String(store?.store_id),
-        )
-      : tenantProducts
-    ).map((product) => String(product.product_id)),
+    storeProducts.map((product) => String(product.product_id)),
   );
 
-  const availableCatalogProducts = (
-    isShopManager ? products : catalogProducts
-  ).filter((product) => {
-    const notLinked = !alreadyLinkedIds.has(String(product.product_id));
-
-    const matchesSearch = isShopManager
-      ? (product.product_name ?? "")
-          .toLowerCase()
-          .includes(catalogSearch.trim().toLowerCase())
-      : true;
-
-    return notLinked && matchesSearch;
-  });
+  const availableCatalogProducts = catalogProducts.filter(
+    (product) => !alreadyLinkedIds.has(String(product.product_id)),
+  );
 
   const handleToggle = async (productId, currentShow) => {
     const nextShow = !currentShow;
 
-    if (isShopManager) {
-      const sp = storeProducts.find(
-        (sp) => sp.store_id === store.store_id && sp.product_id === productId,
-      );
-
-      if (sp) sp.to_show = !currentShow;
-      setRefresh((r) => r + 1);
-      return;
-    }
-
     try {
       await apiToggleProductVisibility(store.store_id, productId, nextShow);
 
-      setTenantProducts((currentProducts) =>
+      setStoreProducts((currentProducts) =>
         currentProducts.map((product) =>
           String(product.product_id) === String(productId)
             ? { ...product, to_show: nextShow }
@@ -183,46 +147,31 @@ export default function ProductsView({ stores, role }) {
     setProductError("");
 
     try {
-      if (isShopManager) {
-        const productId = `p${Date.now()}`;
-        products.push({
-          product_id: productId,
-          product_name: newProduct.product_name,
-          category: newProduct.category,
-          price: parseFloat(newProduct.price) || 0,
-          imageUrl: newProduct.imageUrl || productImages.fashion[0],
-        });
-        storeProducts.push({
-          store_id: store.store_id,
-          product_id: productId,
-          to_show: false,
-        });
-      } else {
-        const created = await apiCreateProduct({
-          product_name: productName,
-          category: newProduct.category,
-          price,
-          image_url: newProduct.imageUrl.trim() || null,
-        });
+      const created = await apiCreateProduct({
+        product_name: productName,
+        category: newProduct.category,
+        price,
+        image_url: newProduct.imageUrl.trim() || null,
+      });
 
-        const productId = created.product_id;
+      const productId = created.product_id;
 
-        if (productId == null) {
-          throw new Error(
-            "The product was created but the response did not include it's ID.",
-          );
-        }
-
-        await apiAttachProduct(store.store_id, productId, false);
-
-        setTenantProducts((current) => [
-          ...current,
-          {
-            ...created,
-            to_show: false,
-          },
-        ]);
+      if (productId == null) {
+        throw new Error(
+          "The product was created but the response did not include its ID.",
+        );
       }
+
+      await apiAttachProduct(store.store_id, productId, false);
+
+      setStoreProducts((currentProducts) => [
+        ...currentProducts,
+        {
+          ...created,
+          store_id: store.store_id,
+          to_show: false,
+        },
+      ]);
 
       setShowAdd(false);
       setNewProduct({
@@ -233,10 +182,6 @@ export default function ProductsView({ stores, role }) {
       });
       setProductError("");
       setActiveProductTab("existing");
-
-      if (isShopManager) {
-        setRefresh((r) => r + 1);
-      }
     } catch (error) {
       setProductError(
         error.message || "Failed to add the product. Please try again.",
@@ -262,27 +207,24 @@ export default function ProductsView({ stores, role }) {
     setProductError("");
 
     try {
-      if (isShopManager) {
-        storeProducts.push({
-          store_id: store.store_id,
-          product_id: product.product_id,
-          to_show: false,
-        });
+      await apiAttachProduct(store.store_id, product.product_id, false);
 
-        setRefresh((r) => r + 1);
-      } else {
-        await apiAttachProduct(store.store_id, product.product_id, false);
+      setStoreProducts((currentProducts) => {
+        const alreadyLinked = currentProducts.some(
+          (item) => String(item.product_id) === String(product.product_id),
+        );
 
-        setTenantProducts((currentProducts) => {
-          const alreadyLinked = currentProducts.some(
-            (item) => String(item.product_id) === String(product.product_id),
-          );
+        if (alreadyLinked) return currentProducts;
 
-          if (alreadyLinked) return currentProducts;
-
-          return [...currentProducts, { ...product, to_show: false }];
-        });
-      }
+        return [
+          ...currentProducts,
+          {
+            ...product,
+            store_id: store.store_id,
+            to_show: false,
+          },
+        ];
+      });
 
       setCatalogSearch("");
       setSelectedCatalogProductId("");
@@ -303,28 +245,14 @@ export default function ProductsView({ stores, role }) {
     setUnlinkError("");
 
     try {
-      if (isShopManager) {
-        const index = storeProducts.findIndex(
-          (item) =>
-            String(item.store_id) === String(store.store_id) &&
-            String(item.product_id) === String(productToUnlink.product_id),
-        );
+      await apiDetachProduct(store.store_id, productToUnlink.product_id);
 
-        if (index !== -1) {
-          storeProducts.splice(index, 1);
-        }
-
-        setRefresh((r) => r + 1);
-      } else {
-        await apiDetachProduct(store.store_id, productToUnlink.product_id);
-
-        setTenantProducts((currentProducts) =>
-          currentProducts.filter(
-            (product) =>
-              String(product.product_id) !== String(productToUnlink.product_id),
-          ),
-        );
-      }
+      setStoreProducts((currentProducts) =>
+        currentProducts.filter(
+          (product) =>
+            String(product.product_id) !== String(productToUnlink.product_id),
+        ),
+      );
 
       setProductToUnlink(null);
       setUnlinkError("");
@@ -337,15 +265,16 @@ export default function ProductsView({ stores, role }) {
     }
   };
 
-  if (!store)
+  if (!store) {
     return (
       <EmptyState title="No stores" message="You don't have any stores yet." />
     );
+  }
 
   const CATEGORIES = ["Fashion", "Electronics", "Home & Decor", "Beauty"];
 
   return (
-    <div key={refresh}>
+    <div>
       <PageHeader
         title="Products"
         subtitle="Manage your product listings and top-selling flags"
@@ -358,13 +287,18 @@ export default function ProductsView({ stores, role }) {
           </button>
         }
       />
+
       {stores.length > 1 && (
         <div className="flex gap-2 mb-6 flex-wrap">
           {stores.map((s) => (
             <button
               key={s.store_id}
               onClick={() => setSelectedStore(s.store_id)}
-              className={`px-3 py-1.5 rounded-lg text-sm ${selectedStore === s.store_id ? "bg-brand-600 text-white" : "bg-white border border-slate-300 text-slate-600"}`}
+              className={`px-3 py-1.5 rounded-lg text-sm ${
+                selectedStore === s.store_id
+                  ? "bg-brand-600 text-white"
+                  : "bg-white border border-slate-300 text-slate-600"
+              }`}
             >
               {s.store_name}
             </button>
@@ -380,7 +314,7 @@ export default function ProductsView({ stores, role }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {storeProductList.map((product) => (
+        {storeProducts.map((product) => (
           <div key={product.product_id} className="card overflow-hidden">
             <div className="relative h-32 overflow-hidden bg-slate-100">
               <img
@@ -392,7 +326,11 @@ export default function ProductsView({ stores, role }) {
                 onClick={() =>
                   handleToggle(product.product_id, product.to_show)
                 }
-                className={`absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center ${product.to_show ? "bg-amber-500 text-white" : "bg-white/80 text-slate-400"}`}
+                className={`absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center ${
+                  product.to_show
+                    ? "bg-amber-500 text-white"
+                    : "bg-white/80 text-slate-400"
+                }`}
               >
                 {product.to_show ? (
                   <Star size={14} fill="currentColor" />
@@ -401,6 +339,7 @@ export default function ProductsView({ stores, role }) {
                 )}
               </button>
             </div>
+
             <div className="p-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-400">{product.category}</p>
@@ -568,6 +507,7 @@ export default function ProductsView({ stores, role }) {
                   placeholder="e.g. Cotton Shirt"
                 />
               </div>
+
               <div>
                 <label className="label">Category</label>
                 <select
@@ -584,6 +524,7 @@ export default function ProductsView({ stores, role }) {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="label">Price ($)</label>
                 <input
@@ -596,6 +537,7 @@ export default function ProductsView({ stores, role }) {
                   placeholder="e.g. 49.99"
                 />
               </div>
+
               <div>
                 <label className="label">Image URL (optional)</label>
                 <input
@@ -607,11 +549,13 @@ export default function ProductsView({ stores, role }) {
                   placeholder="Leave blank for default"
                 />
               </div>
+
               {productError && (
                 <p className="text-sm text-red-600" role="alert">
                   {productError}
                 </p>
               )}
+
               <button
                 onClick={handleAddProduct}
                 disabled={savingProduct}

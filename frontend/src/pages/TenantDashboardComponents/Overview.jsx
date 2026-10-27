@@ -4,49 +4,55 @@ import { useAuth } from "@/context/AuthContext.jsx";
 import { PageHeader, StatCard, Badge } from "@/components/ui/index.jsx";
 import {
   apiGetEmployeesByTenant,
+  apiGetEmployeesByStore,
   apiGetProductsByStore,
   apiGetTransactionsByTenant,
   apiGetMallById,
 } from "@/lib/api";
-import {
-  getProductsByStore,
-  getEmployeesByStore,
-  getMallById,
-} from "@/lib/mockData.js";
 
 export default function Overview({ role, stores, tenantId }) {
   const { user } = useAuth();
   const isShopManager = role === "shop_manager";
+  const shopManagerStoreId = isShopManager ? stores[0]?.store_id : null;
 
-  const [tenantEmployees, setTenantEmployees] = useState([]);
-  const [tenantProducts, setTenantProducts] = useState([]);
-  const [tenantTransactions, setTenantTransactions] = useState([]);
-  const [tenantMalls, setTenantMalls] = useState({});
+  const [employees, setEmployees] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [malls, setMalls] = useState({});
 
   useEffect(() => {
-    if (isShopManager || !tenantId) return;
+    if (isShopManager ? shopManagerStoreId == null : !tenantId) {
+      setEmployees([]);
+      return;
+    }
 
     let cancelled = false;
 
-    apiGetEmployeesByTenant(tenantId)
+    const request = isShopManager
+      ? apiGetEmployeesByStore(shopManagerStoreId)
+      : apiGetEmployeesByTenant(tenantId);
+
+    request
       .then((data) => {
         if (!cancelled) {
-          setTenantEmployees(
+          setEmployees(
             Array.isArray(data) ? data : (data?.content ?? data?.items ?? []),
           );
         }
       })
       .catch((error) => {
-        console.error("Failed to load tenant employees:", error);
+        if (!cancelled) {
+          console.error("Failed to load employees:", error);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isShopManager, tenantId]);
+  }, [isShopManager, tenantId, shopManagerStoreId]);
 
   useEffect(() => {
-    if (isShopManager || !tenantId || stores.length === 0) return;
+    if (stores.length === 0) return;
 
     let cancelled = false;
 
@@ -54,11 +60,11 @@ export default function Overview({ role, stores, tenantId }) {
       stores.map(async (store) => {
         const data = await apiGetProductsByStore(store.store_id);
 
-        const products = Array.isArray(data)
+        const storeProducts = Array.isArray(data)
           ? data
           : (data?.content ?? data?.items ?? []);
 
-        return products.map((product) => ({
+        return storeProducts.map((product) => ({
           ...product,
           store_id: store.store_id,
         }));
@@ -66,29 +72,32 @@ export default function Overview({ role, stores, tenantId }) {
     )
       .then((productsByStore) => {
         if (!cancelled) {
-          setTenantProducts(productsByStore.flat());
+          setProducts(productsByStore.flat());
         }
       })
       .catch((error) => {
         if (!cancelled) {
-          console.error("Failed to load tenant products:", error);
+          console.error("Failed to load products:", error);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isShopManager, tenantId, stores]);
+  }, [stores]);
 
   useEffect(() => {
-    if (isShopManager || !tenantId) return;
+    if (isShopManager || !tenantId) {
+      setTransactions([]);
+      return;
+    }
 
     let cancelled = false;
 
     apiGetTransactionsByTenant(tenantId)
       .then((data) => {
         if (!cancelled) {
-          setTenantTransactions(
+          setTransactions(
             Array.isArray(data) ? data : (data?.content ?? data?.items ?? []),
           );
         }
@@ -105,7 +114,7 @@ export default function Overview({ role, stores, tenantId }) {
   }, [isShopManager, tenantId]);
 
   useEffect(() => {
-    if (isShopManager || !tenantId || stores.length === 0) return;
+    if (stores.length === 0) return;
 
     let cancelled = false;
 
@@ -123,28 +132,21 @@ export default function Overview({ role, stores, tenantId }) {
     )
       .then((entries) => {
         if (!cancelled) {
-          setTenantMalls(Object.fromEntries(entries));
+          setMalls(Object.fromEntries(entries));
         }
       })
       .catch((error) => {
         if (!cancelled) {
-          console.error("Failed to load tenant malls:", error);
+          console.error("Failed to load malls:", error);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isShopManager, tenantId, stores]);
+  }, [stores]);
 
-  const allEmployees = isShopManager
-    ? stores.flatMap((s) => getEmployeesByStore(s.store_id))
-    : tenantEmployees;
-  const allProducts = isShopManager
-    ? stores.flatMap((s) => getProductsByStore(s.store_id))
-    : tenantProducts;
-  const topProducts = allProducts.filter((p) => p.to_show);
-  const transactions = isShopManager ? [] : tenantTransactions;
+  const topProducts = products.filter((product) => product.to_show);
   const totalRevenue = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   return (
@@ -157,23 +159,26 @@ export default function Overview({ role, stores, tenantId }) {
             : `${stores.length} stores across malls`
         }
       />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           icon={Store}
-          label="Active Stores"
-          value={stores.length}
+          label={isShopManager ? "Store Status" : "Active Stores"}
+          value={
+            isShopManager ? (stores[0]?.status ?? "Unknown") : stores.length
+          }
           color="brand"
         />
         <StatCard
           icon={Users}
           label="Employees"
-          value={allEmployees.length}
+          value={employees.length}
           color="success"
         />
         <StatCard
           icon={Package}
           label="Total Products"
-          value={allProducts.length}
+          value={products.length}
           color="accent"
         />
         <StatCard
@@ -198,22 +203,22 @@ export default function Overview({ role, stores, tenantId }) {
         </div>
       )}
 
-      <h3 className="font-semibold text-slate-900 mb-4">Your Stores</h3>
+      <h3 className="font-semibold text-slate-900 mb-4">
+        {isShopManager ? "Your Store" : "Your Stores"}
+      </h3>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {stores.map((store) => {
-          const mall = isShopManager
-            ? getMallById(store.mall_id)
-            : tenantMalls[String(store.mall_id)];
-          const storeEmps = isShopManager
-            ? getEmployeesByStore(store.store_id)
-            : tenantEmployees.filter(
-                (e) => String(e.store_id) === String(store.store_id),
-              );
-          const storeProds = isShopManager
-            ? getProductsByStore(store.store_id)
-            : tenantProducts.filter(
-                (p) => String(p.store_id) === String(store.store_id),
-              );
+          const mall = malls[String(store.mall_id)];
+
+          const storeEmployees = employees.filter(
+            (employee) => String(employee.store_id) === String(store.store_id),
+          );
+
+          const storeProducts = products.filter(
+            (product) => String(product.store_id) === String(store.store_id),
+          );
+
           return (
             <div key={store.store_id} className="card p-4">
               <div className="flex items-start justify-between mb-2">
@@ -228,22 +233,24 @@ export default function Overview({ role, stores, tenantId }) {
                     </p>
                   </div>
                 </div>
+
                 <Badge
                   variant={store.status === "occupied" ? "success" : "warning"}
                 >
                   {store.status}
                 </Badge>
               </div>
+
               <div className="flex gap-4 text-xs text-slate-500">
                 <span className="flex items-center gap-1">
-                  <Users size={12} /> {storeEmps.length} emps
+                  <Users size={12} /> {storeEmployees.length} emps
                 </span>
                 <span className="flex items-center gap-1">
-                  <Package size={12} /> {storeProds.length} products
+                  <Package size={12} /> {storeProducts.length} products
                 </span>
                 <span className="flex items-center gap-1">
                   <Star size={12} />{" "}
-                  {storeProds.filter((p) => p.to_show).length} top
+                  {storeProducts.filter((p) => p.to_show).length} top
                 </span>
               </div>
             </div>

@@ -55,7 +55,7 @@ const propertyImages = [
 // ΓöÇΓöÇ Malls ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const malls = [
   {
-    mall_id: "m1",
+    mall_id: 1,
     mall_name: "Heritage Plaza",
     mall_area_sqft: 1850000,
     opening_date: "2019-03-15",
@@ -107,14 +107,14 @@ export const malls = [
 // ΓöÇΓöÇ Stores ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const stores = [
   {
-    store_id: "s1",
+    store_id: 1,
     shop_number: "G-12",
     floor: 1,
     area_sqft: 2400,
     store_name: "Urban Threads",
     status: "occupied",
     listing_media: [storeImages[0]],
-    mall_id: "m1",
+    mall_id: 1,
   },
   {
     store_id: "s2",
@@ -1000,7 +1000,7 @@ export const demoUsers = [
     role: "shop_manager",
     firstName: "Marcus",
     lastName: "Chen",
-    profileId: "e1",
+    profileId: 1,
   },
   {
     id: 444,

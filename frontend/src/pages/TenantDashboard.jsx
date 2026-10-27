@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 import { useRouter } from "@/context/RouterContext.jsx";
 import { LoadingSpinner } from "@/components/ui/index.jsx";
-import { apiGetStoresByTenant } from "@/lib/api";
-import { getStoresByTenant, getStoreById, stores } from "@/lib/mockData.js";
+import { apiGetStoresByTenant, apiGetStoreById } from "@/lib/api";
 
 import Overview from "./TenantDashboardComponents/Overview";
 import StoresView from "./TenantDashboardComponents/StoresView";
@@ -13,45 +12,74 @@ import LeaveView from "./TenantDashboardComponents/LeaveView";
 import TransactionsView from "./TenantDashboardComponents/TransactionsView";
 import RevenueView from "./TenantDashboardComponents/RevenueView";
 
+const SHOP_MANAGER_STORE_ID = 1;
+
 export default function TenantDashboard({ role = "tenant" }) {
   const { user } = useAuth();
   const { route } = useRouter();
 
   const isShopManager = role === "shop_manager";
-  const tenantId = isShopManager ? null : user?.profileId;
+  const profileId = user?.profileId;
 
   const [tenantStores, setTenantStores] = useState([]);
-  const [storesLoading, setStoresLoading] = useState(!isShopManager);
+  const [shopManagerStore, setShopManagerStore] = useState(null);
+  const [storesLoading, setStoresLoading] = useState(true);
   const [storesError, setStoresError] = useState("");
 
   useEffect(() => {
-    if (isShopManager || !tenantId) return;
+    if (!user) return;
 
     let cancelled = false;
 
     setStoresLoading(true);
     setStoresError("");
 
-    apiGetStoresByTenant(tenantId)
-      .then((data) => {
-        if (!cancelled) {
-          setTenantStores(
-            Array.isArray(data) ? data : (data?.content ?? data?.items ?? []),
-          );
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setStoresError(error.message || "Failed to load stores");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setStoresLoading(false);
-      });
+    if (isShopManager) {
+      apiGetStoreById(SHOP_MANAGER_STORE_ID)
+        .then((data) => {
+          if (!cancelled) {
+            setShopManagerStore(data);
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setStoresError(error.message || "Failed to load store");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setStoresLoading(false);
+        });
+    } else {
+      if (!profileId) {
+        setTenantStores([]);
+        setStoresLoading(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+
+      apiGetStoresByTenant(profileId)
+        .then((data) => {
+          if (!cancelled) {
+            setTenantStores(
+              Array.isArray(data) ? data : (data?.content ?? data?.items ?? []),
+            );
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setStoresError(error.message || "Failed to load stores");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setStoresLoading(false);
+        });
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [isShopManager, tenantId]);
+  }, [isShopManager, profileId, user]);
 
   if (!user) return <LoadingSpinner />;
 
@@ -65,17 +93,9 @@ export default function TenantDashboard({ role = "tenant" }) {
     );
   }
 
-  const allStores = isShopManager
-    ? [getStoreById("s1")].filter(Boolean)
-    : tenantStores;
-
-  const shopManagerStore = isShopManager
-    ? stores.find((s) => s.store_id === "s1")
-    : null;
-
   const activeStores = isShopManager
     ? [shopManagerStore].filter(Boolean)
-    : allStores;
+    : tenantStores;
 
   const pageKey =
     route.split("/").pop() || (isShopManager ? "shop-manager" : "tenant");
@@ -84,8 +104,15 @@ export default function TenantDashboard({ role = "tenant" }) {
     pageKey === (isShopManager ? "shop-manager" : "tenant") ||
     pageKey === ""
   ) {
-    return <Overview role={role} stores={activeStores} tenantId={tenantId} />;
+    return (
+      <Overview
+        role={role}
+        stores={activeStores}
+        tenantId={isShopManager ? null : profileId}
+      />
+    );
   }
+
   if (pageKey === "stores" || pageKey === "store") {
     return (
       <StoresView
@@ -105,32 +132,40 @@ export default function TenantDashboard({ role = "tenant" }) {
       />
     );
   }
+
   if (pageKey === "products") {
     return <ProductsView stores={activeStores} role={role} />;
   }
+
   if (pageKey === "employees") {
     return (
-      <EmployeesView
-        stores={activeStores}
-        role={role}
-        profileId={user?.profileId}
-      />
+      <EmployeesView stores={activeStores} role={role} profileId={profileId} />
     );
   }
+
   if (pageKey === "leave" && isShopManager) {
     return <LeaveView stores={activeStores} />;
   }
+
   if (pageKey === "transactions") {
     return (
       <TransactionsView
-        tenantId={tenantId}
+        tenantId={isShopManager ? null : profileId}
         isShopManager={isShopManager}
         stores={activeStores}
       />
     );
   }
+
   if (pageKey === "revenue") {
-    return <RevenueView tenantId={tenantId} />;
+    return <RevenueView tenantId={isShopManager ? null : profileId} />;
   }
-  return <Overview role={role} stores={activeStores} tenantId={tenantId} />;
+
+  return (
+    <Overview
+      role={role}
+      stores={activeStores}
+      tenantId={isShopManager ? null : profileId}
+    />
+  );
 }
