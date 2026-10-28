@@ -68,6 +68,20 @@ public class MallService {
         return toResponse(malls.save(m));
     }
 
+    public void delete(Integer id) {
+        ensureMall(id);
+        if (stores.existsByMallId(id)) {
+            throw ApiException.conflict("Mall still has stores");
+        }
+        if (employees.existsByMallId(id)) {
+            throw ApiException.conflict("Mall still has employees");
+        }
+        if (managers.existsByMallId(id)) {
+            throw ApiException.conflict("Mall still has a manager");
+        }
+        malls.deleteById(id);
+    }
+
     public MallDtos.MallResponse toResponse(Mall m) {
         List<String> numbers = contacts.findByIdMallId(m.getMallId()).stream()
                 .map(c -> c.getId().getContactNumber()).toList();

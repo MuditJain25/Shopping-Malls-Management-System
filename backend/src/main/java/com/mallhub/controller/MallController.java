@@ -38,6 +38,12 @@ public class MallController {
         return malls.get(id);
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Integer id) {
+        malls.delete(id);
+    }
+
     @GetMapping("/{id}/stores")
     public Object stores(@PathVariable Integer id,
                          @RequestParam(required = false) Integer page,
