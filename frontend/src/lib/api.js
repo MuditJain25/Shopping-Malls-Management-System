@@ -306,6 +306,12 @@ export async function apiCreateMall(mallData) {
   return normalizeMall(data);
 }
 
+export async function apiDeleteMall(id) {
+  return apiFetch(`/malls/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function apiGetNearestMalls(lat, lng, limit = 5) {
   const params = new URLSearchParams({ lat, lng, limit });
   const data = await apiFetch(`/malls/nearest?${params}`);
@@ -478,11 +484,13 @@ export async function resolveBackendUserId(user) {
     return Number(user);
   }
   const email = user?.email;
-  if (!email) throw new Error("Cannot resolve backend user id without an email");
+  if (!email)
+    throw new Error("Cannot resolve backend user id without an email");
   if (backendUserIds[email]) return backendUserIds[email];
   const res = await apiFetch(`/auth/me?email=${encodeURIComponent(email)}`);
   const id = res?.user?.id;
-  if (!Number.isInteger(id)) throw new Error("Backend did not return a user id");
+  if (!Number.isInteger(id))
+    throw new Error("Backend did not return a user id");
   backendUserIds[email] = id;
   return id;
 }
@@ -491,7 +499,11 @@ export async function apiPlaceBid(eventId, user, bidAmount, bidderName) {
   const uid = await resolveBackendUserId(user);
   const data = await apiFetch(`/bid-events/${eventId}/bids`, {
     method: "POST",
-    body: JSON.stringify({ user_id: uid, bid_amount: bidAmount, bidder_name: bidderName }),
+    body: JSON.stringify({
+      user_id: uid,
+      bid_amount: bidAmount,
+      bidder_name: bidderName,
+    }),
   });
   return normalizeBid(data);
 }
