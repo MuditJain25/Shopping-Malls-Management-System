@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface MallManagerRepository extends JpaRepository<MallManager, Integer> {
     Optional<MallManager> findByMallId(Integer mallId);
+    boolean existsByMallId(Integer mallId);
     Optional<MallManager> findByEmail(String email);
 }

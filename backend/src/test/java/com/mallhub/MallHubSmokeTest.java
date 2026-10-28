@@ -174,6 +174,27 @@ class MallHubSmokeTest {
     }
 
     @Test
+    void mallDeleteBlockedWhileItHasStoresElseRemoved() throws Exception {
+        mvc.perform(delete("/api/malls/1"))
+                .andExpect(status().isConflict());
+
+        var created = mvc.perform(post("/api/malls")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"city":"Smoke City"}"""))
+                .andExpect(status().isCreated())
+                .andReturn();
+        int id = json.readTree(created.getResponse().getContentAsString()).get("mall_id").asInt();
+
+        mvc.perform(delete("/api/malls/" + id))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/malls/" + id))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/malls/" + id))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void creatingEmployeeRejectsDuplicateEmail() throws Exception {
         mvc.perform(post("/api/employees")
                         .contentType(MediaType.APPLICATION_JSON)
