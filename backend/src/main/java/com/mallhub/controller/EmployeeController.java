@@ -6,6 +6,7 @@ import com.mallhub.service.EmployeeService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -21,22 +22,26 @@ public class EmployeeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','SHOP_MANAGER')")
     public Object create(@Valid @RequestBody PeopleDtos.EmployeeCreateRequest req) {
         return employees.create(req);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','SHOP_MANAGER','TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object get(@PathVariable Integer id) {
         return employees.get(id);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','SHOP_MANAGER')")
     public void delete(@PathVariable Integer id) {
         employees.delete(id);
     }
 
     @GetMapping("/{id}/leave-requests")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','SHOP_MANAGER','TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object leaves(@PathVariable Integer id,
                          @RequestParam(required = false) Integer page,
                          @RequestParam(required = false) Integer size) {
@@ -46,18 +51,21 @@ public class EmployeeController {
 
     @PostMapping("/{id}/leave-requests")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('EMPLOYEE','SHOP_MANAGER')")
     public Object applyLeave(@PathVariable Integer id,
                              @Valid @RequestBody PeopleDtos.LeaveApplyRequest req) {
         return employees.applyLeave(id, req);
     }
 
     @PatchMapping("/{id}/leave-requests/{rid}")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','SHOP_MANAGER')")
     public Object decideLeave(@PathVariable Integer id, @PathVariable Integer rid,
                               @Valid @RequestBody PeopleDtos.LeaveDecisionRequest req) {
         return employees.decideLeave(id, rid, req.status());
     }
 
     @GetMapping("/{id}/payroll")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','SHOP_MANAGER','TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object payroll(@PathVariable Integer id,
                           @RequestParam(required = false) Integer page,
                           @RequestParam(required = false) Integer size) {
@@ -66,6 +74,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/{id}/attendance")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','SHOP_MANAGER','TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object attendance(@PathVariable Integer id,
                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -76,11 +85,13 @@ public class EmployeeController {
     }
 
     @PostMapping("/{id}/attendance/check-in")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','SHOP_MANAGER')")
     public Object checkIn(@PathVariable Integer id) {
         return employees.checkIn(id);
     }
 
     @PostMapping("/{id}/attendance/check-out")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','SHOP_MANAGER')")
     public Object checkOut(@PathVariable Integer id) {
         return employees.checkOut(id);
     }

@@ -5,6 +5,7 @@ import com.mallhub.dto.Paging;
 import com.mallhub.service.StoreService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -40,11 +41,13 @@ public class StoreController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object create(@Valid @RequestBody MallDtos.StoreCreateRequest req) {
         return stores.create(req);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object update(@PathVariable Integer id,
                          @Valid @RequestBody MallDtos.StoreUpdateRequest req) {
         return stores.update(id, req);
@@ -52,6 +55,7 @@ public class StoreController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public void delete(@PathVariable Integer id) {
         stores.delete(id);
     }
@@ -66,12 +70,14 @@ public class StoreController {
 
     @PostMapping("/{id}/products/{productId}")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER')")
     public Object attachProduct(@PathVariable Integer id, @PathVariable Integer productId,
                                 @RequestBody(required = false) MallDtos.VisibilityRequest req) {
         return stores.attachProduct(id, productId, req == null ? null : req.toShow());
     }
 
     @PutMapping("/{id}/products/{pid}")
+    @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER')")
     public Object setVisibility(@PathVariable Integer id, @PathVariable Integer pid,
                                 @RequestBody MallDtos.VisibilityRequest req) {
         stores.setVisibility(id, pid, req == null ? null : req.toShow());
@@ -80,11 +86,13 @@ public class StoreController {
 
     @DeleteMapping("/{id}/products/{pid}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER')")
     public void detachProduct(@PathVariable Integer id, @PathVariable Integer pid) {
         stores.detachProduct(id, pid);
     }
 
     @GetMapping("/{id}/employees")
+    @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER','EXECUTIVE')")
     public Object employees(@PathVariable Integer id,
                             @RequestParam(required = false) Integer page,
                             @RequestParam(required = false) Integer size) {
@@ -101,12 +109,14 @@ public class StoreController {
 
     @PostMapping("/{id}/offers")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object createOffer(@PathVariable Integer id,
                               @Valid @RequestBody MallDtos.OfferCreateRequest req) {
         return stores.createOffer(id, req);
     }
 
     @PutMapping("/{id}/offers/{oid}")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object updateOffer(@PathVariable Integer id, @PathVariable Integer oid,
                               @Valid @RequestBody MallDtos.OfferCreateRequest req) {
         return stores.updateOffer(id, oid, req);
@@ -114,6 +124,7 @@ public class StoreController {
 
     @DeleteMapping("/{id}/offers/{oid}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','EXECUTIVE')")
     public void deleteOffer(@PathVariable Integer id, @PathVariable Integer oid) {
         stores.deleteOffer(id, oid);
     }

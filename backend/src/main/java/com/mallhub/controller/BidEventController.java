@@ -5,6 +5,7 @@ import com.mallhub.dto.Paging;
 import com.mallhub.service.BidService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -27,6 +28,7 @@ public class BidEventController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object create(@Valid @RequestBody BidDtos.BidEventCreateRequest req) {
         return bids.createEvent(req);
     }
@@ -46,11 +48,13 @@ public class BidEventController {
 
     @PostMapping("/{id}/bids")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('CUSTOMER')")
     public Object place(@PathVariable Integer id, @Valid @RequestBody BidDtos.PlaceBidRequest req) {
         return bids.placeBid(id, req);
     }
 
     @PutMapping("/{id}/finalize")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object finalizeEvent(@PathVariable Integer id,
                                 @RequestBody(required = false) BidDtos.FinalizeRequest req) {
         return bids.finalizeEvent(id, req);

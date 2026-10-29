@@ -2,6 +2,7 @@ package com.mallhub.controller;
 
 import com.mallhub.dto.Paging;
 import com.mallhub.service.TransactionService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -14,6 +15,7 @@ public class TransactionController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object list(@RequestParam(required = false) Integer mallId,
                        @RequestParam(required = false) Integer page,
                        @RequestParam(required = false) Integer size) {

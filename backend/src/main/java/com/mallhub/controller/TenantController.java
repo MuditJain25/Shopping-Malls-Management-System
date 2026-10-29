@@ -7,6 +7,7 @@ import com.mallhub.service.EmployeeService;
 import com.mallhub.service.TenantService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -21,6 +22,7 @@ public class TenantController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object list(@RequestParam(required = false) Integer mallId,
                        @RequestParam(required = false) Integer page,
                        @RequestParam(required = false) Integer size) {
@@ -34,12 +36,14 @@ public class TenantController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object create(@Valid @RequestBody PeopleDtos.TenantCreateRequest req) {
         return tenants.create(req);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public void delete(@PathVariable Integer id) {
         tenants.delete(id);
     }
@@ -50,6 +54,7 @@ public class TenantController {
     }
 
     @GetMapping("/{id}/employees")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object employeesByTenant(@PathVariable Integer id,
                                     @RequestParam(required = false) Integer page,
                                     @RequestParam(required = false) Integer size) {
@@ -59,6 +64,7 @@ public class TenantController {
 
     @PostMapping("/{id}/employees")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('TENANT')")
     public Object addEmployee(@PathVariable Integer id,
                               @Valid @RequestBody PeopleDtos.EmployeeCreateRequest req) {
         if (!tenants.ownsStore(id, req.storeId())) {
@@ -68,6 +74,7 @@ public class TenantController {
     }
 
     @GetMapping("/{id}/transactions")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','EXECUTIVE')")
     public Object transactions(@PathVariable Integer id,
                                @RequestParam(required = false) Integer page,
                                @RequestParam(required = false) Integer size) {
@@ -76,6 +83,7 @@ public class TenantController {
     }
 
     @GetMapping("/{id}/revenue")
+    @PreAuthorize("hasAnyRole('TENANT','EXECUTIVE')")
     public Object revenue(@PathVariable Integer id,
                           @RequestParam(required = false) Integer page,
                           @RequestParam(required = false) Integer size) {
@@ -85,6 +93,7 @@ public class TenantController {
 
     @PostMapping("/{id}/revenue")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('TENANT')")
     public Object submitRevenue(@PathVariable Integer id,
                                 @Valid @RequestBody PeopleDtos.RevenueCreateRequest req) {
         return tenants.submitRevenue(id, req);

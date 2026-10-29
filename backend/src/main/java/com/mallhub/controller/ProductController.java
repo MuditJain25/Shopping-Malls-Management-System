@@ -6,6 +6,7 @@ import com.mallhub.exception.ApiException;
 import com.mallhub.repository.ProductRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,6 +37,7 @@ public class ProductController {
     /** Catalog entry only - attaching it to a store is POST /api/stores/{id}/products/{pid}. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER')")
     public MallDtos.ProductResponse create(@Valid @RequestBody MallDtos.ProductCreateRequest req) {
         var p = new Product();
         p.setProductName(req.productName());

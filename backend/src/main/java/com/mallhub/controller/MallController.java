@@ -6,6 +6,7 @@ import com.mallhub.service.BidService;
 import com.mallhub.service.MallService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,6 +30,7 @@ public class MallController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('EXECUTIVE')")
     public Object create(@Valid @RequestBody MallDtos.MallCreateRequest req) {
         return malls.create(req);
     }
@@ -64,11 +66,13 @@ public class MallController {
     }
 
     @GetMapping("/{id}/manager")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object manager(@PathVariable Integer id) {
         return malls.managerByMall(id);
     }
 
     @GetMapping("/{id}/employees")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
     public Object employees(@PathVariable Integer id,
                             @RequestParam(required = false) Integer storeId,
                             @RequestParam(required = false) Integer page,
