@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface StoreRepository extends JpaRepository<Store, Integer> {
 
+    boolean existsByMallId(Integer mallId);
+
     Page<Store> findByMallId(Integer mallId, Pageable pageable);
 
     boolean existsByMallId(Integer mallId);

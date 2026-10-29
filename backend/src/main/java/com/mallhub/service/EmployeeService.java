@@ -64,6 +64,26 @@ public class EmployeeService {
     }
 
     @Transactional
+    public PeopleDtos.EmployeeResponse update(Integer id, PeopleDtos.EmployeeCreateRequest req) {
+        var e = require(id);
+        if (req.email() != null && !req.email().isBlank()
+                && !req.email().equals(e.getEmail())
+                && employees.findByEmail(req.email()).isPresent()) {
+            throw ApiException.conflict("Email is already registered");
+        }
+        var store = stores.findById(req.storeId()).orElseThrow(() -> ApiException.notFound("Store"));
+        e.setFirstName(req.firstName());
+        e.setLastName(req.lastName());
+        e.setEmail(req.email());
+        e.setPhoneNumber(req.phoneNumber());
+        e.setCurrentDesignation(req.currentDesignation());
+        e.setBaseSalary(req.baseSalary());
+        e.setStoreId(store.getStoreId());
+        e.setMallId(store.getMallId());
+        return toResponse(e);
+    }
+
+    @Transactional
     public void delete(Integer id) {
         if (!employees.existsById(id)) throw ApiException.notFound("Employee");
         employees.deleteById(id);

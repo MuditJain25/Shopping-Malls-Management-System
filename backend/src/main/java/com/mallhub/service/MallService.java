@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -68,17 +69,29 @@ public class MallService {
         return toResponse(malls.save(m));
     }
 
+    @Transactional
+    public MallDtos.MallResponse update(Integer id, MallDtos.MallCreateRequest req) {
+        var m = malls.findById(id).orElseThrow(() -> ApiException.notFound("Mall"));
+        m.setCity(req.city());
+        m.setState(req.state());
+        m.setStreet(req.street());
+        m.setPincode(req.pincode());
+        m.setMallAreaSqft(req.mallAreaSqft());
+        m.setOpeningDate(req.openingDate());
+        m.setLatitude(req.latitude());
+        m.setLongitude(req.longitude());
+        m.setImageUrl(req.imageUrl());
+        m.setDescription(req.description());
+        return toResponse(m);
+    }
+
+    // Cascading is off: a mall only disappears once stores, manager and staff are gone.
+    @Transactional
     public void delete(Integer id) {
         ensureMall(id);
-        if (stores.existsByMallId(id)) {
-            throw ApiException.conflict("Mall still has stores");
-        }
-        if (employees.existsByMallId(id)) {
-            throw ApiException.conflict("Mall still has employees");
-        }
-        if (managers.existsByMallId(id)) {
-            throw ApiException.conflict("Mall still has a manager");
-        }
+        if (stores.existsByMallId(id)) throw ApiException.conflict("Mall still has stores");
+        if (managers.existsByMallId(id)) throw ApiException.conflict("Mall still has a manager");
+        if (employees.existsByMallId(id)) throw ApiException.conflict("Mall still has employees");
         malls.deleteById(id);
     }
 

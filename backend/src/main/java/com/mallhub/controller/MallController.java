@@ -40,8 +40,15 @@ public class MallController {
         return malls.get(id);
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('EXECUTIVE')")
+    public Object update(@PathVariable Integer id, @Valid @RequestBody MallDtos.MallCreateRequest req) {
+        return malls.update(id, req);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('EXECUTIVE')")
     public void delete(@PathVariable Integer id) {
         malls.delete(id);
     }
@@ -66,13 +73,13 @@ public class MallController {
     }
 
     @GetMapping("/{id}/manager")
-    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE') and @access.canAccessMall(#id)")
     public Object manager(@PathVariable Integer id) {
         return malls.managerByMall(id);
     }
 
     @GetMapping("/{id}/employees")
-    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE') and @access.canAccessMall(#id)")
     public Object employees(@PathVariable Integer id,
                             @RequestParam(required = false) Integer storeId,
                             @RequestParam(required = false) Integer page,

@@ -15,7 +15,7 @@ public class LeaveRequestController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SHOP_MANAGER','TENANT','MALL_MANAGER','EXECUTIVE')")
+    @PreAuthorize("hasAnyRole('SHOP_MANAGER','TENANT','MALL_MANAGER','EXECUTIVE') and @access.canAccessStore(#storeId)")
     public Object list(@RequestParam Integer storeId,
                        @RequestParam(required = false) String status,
                        @RequestParam(required = false) Integer page,

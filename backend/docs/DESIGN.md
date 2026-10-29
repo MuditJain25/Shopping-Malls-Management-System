@@ -117,7 +117,7 @@ backend/
         PlaceBidRequest.java         // { user_id, bid_amount, bidder_name }
         FinalizeRequest.java         // { final_allocation }
         ProductCreateRequest.java    // { product_name, category, price, image_url }
-        TenantCreateRequest.java     // { business_name, business_type, email, phone_number, store_ids[] }
+        TenantCreateRequest.java     // { business_name, business_type, email, phone_number }
         EmployeeCreateRequest.java   // { first_name, last_name, email, phone_number, current_designation, base_salary, store_id }
         LeaveApplyRequest.java       // { start_date, end_date, reason }
         LeaveDecisionRequest.java    // { status: approved|rejected }
@@ -337,6 +337,9 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | POST | `/auth/logout` | — | `{success:true}` | auth | no-op |
 | GET | `/malls` | `?q=&city=&page…` | `Mall[]` or Page | permit | `q` searches city/state/description (`LandingPage.jsx:39`) |
 | GET | `/malls/{id}` | — | `Mall` | permit | |
+| POST | `/malls` | MallCreate | `Mall 201` | exec | |
+| PUT | `/malls/{id}` | MallCreate | `Mall` | exec | **added**; fields only, contact numbers untouched |
+| DELETE | `/malls/{id}` | — | `204` | exec | **added**; `409` while stores, a manager or employees remain (cascading off) |
 | GET | `/malls/{id}/stores` | — | `Store[]` | permit | |
 | GET | `/malls/{id}/products/top` | — | `Product[]+store` | permit | `to_show=true` join |
 | GET | `/malls/{id}/manager` | — | `Manager\|null` | mall_manager,exec | singular (mock `getManagerByMall` returns one) |
@@ -357,22 +360,29 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | GET | `/products` | `?search=` | `Product[]` | permit | catalog, **no paging**; `search` matches `product_name` OR `category` |
 | GET | `/products/{id}` | — | `Product` | permit | optional |
 | POST | `/products` | ProductCreate | `Product 201` | auth | catalog entry only, **no** store link; `product_id` is the key, names may repeat |
+| PUT | `/products/{id}` | ProductCreate | `Product` | exec | **added**; catalog rows are global |
+| DELETE | `/products/{id}` | — | `204` | exec | **added**; `409` while any store still lists it |
 | GET | `/bid-events` | `?mallId=&status=` | `BidEvent[]` | permit | |
 | GET | `/bid-events/{id}` | — | `BidEvent` | permit | |
 | GET | `/bid-events/{id}/bids` | — | `Bid[]` | permit | |
 | POST | `/bid-events/{id}/bids` | `{user_id,bid_amount,bidder_name}` | `Bid 201` | customer+ | server validates increment, flips prev winning→outbid atomically |
 | PUT | `/bid-events/{id}/finalize` | `{final_allocation}` | `BidEvent` | mall_manager | string accepted, not persisted (see §6-D10); sets `status=finalized`, `final_allocation=true`; 409 if already finalized |
+| DELETE | `/bid-events/{id}` | — | `204` | mall_manager,exec | **added**; `409` if the event already has bids |
 | GET | `/tenants` | `?mallId=` | `Tenant[]` | exec,mall_manager | `mallId` filters via store join |
 | GET | `/tenants/{id}` | — | `Tenant` | auth | |
-| POST | `/tenants` | TenantCreate | `Tenant 201` | mall_manager,exec | **added** (`TenantsView.jsx:15`); assigns stores → sets `Store.status=occupied` + join rows |
-| DELETE | `/tenants/{id}` | — | `204` | mall_manager,exec | **added**; frees stores → `available` |
+| POST | `/tenants` | `{business_name,business_type,email,phone_number}` | `Tenant 201` | mall_manager,exec | **added**; inserts the tenant only, no store links |
+| PUT | `/tenants/{id}` | same 4 fields | `Tenant` | tenant(self),mall_manager,exec | **added**; does not touch store links |
+| DELETE | `/tenants/{id}` | — | `204` | mall_manager,exec | **added**; `409` while any store is still linked |
 | GET | `/tenants/{id}/stores` | — | `Store[]` | auth | |
+| POST | `/tenants/{id}/stores/{storeId}` | — | `Tenant 201` | mall_manager,exec | **added**; adds a `StoreTenant` row, `Store.status` untouched, `409` if already linked |
+| DELETE | `/tenants/{id}/stores/{storeId}` | — | `204` | mall_manager,exec | **added**; deletes the join row, `404` if not linked |
 | GET | `/tenants/{id}/employees` | — | `Employee[]` | tenant,mall_manager | aggregate over tenant stores |
 | POST | `/tenants/{id}/employees` | EmployeeCreate | `Employee 201` | tenant | store must belong to tenant |
 | GET | `/tenants/{id}/revenue` | — | `Revenue[]` | tenant,exec | DEFERRED v2.1 — not in MVP build (pending P2) |
 | POST | `/tenants/{id}/revenue` | `{description,month,amount}` | `Revenue 201` | tenant | DEFERRED v2.1 — not in MVP build (pending P2) |
 | GET | `/tenants/{id}/transactions` | — | `Txn[]` | tenant | `sender = tenant.business_name` |
 | GET | `/employees/{id}` | — | `Employee` | self,manager,tenant | |
+| PUT | `/employees/{id}` | EmployeeCreate | `Employee` | tenant,shop_manager,mall_manager,exec | **added**; may move store (and follows its mall) |
 | DELETE | `/employees/{id}` | — | `204` | tenant,mall_manager | **added** (`EmployeesView.jsx:34`) |
 | GET | `/employees/{id}/leave-requests` | — | `Leave[]` | self,manager | |
 | POST | `/employees/{id}/leave-requests` | `{start_date,end_date,reason}` | `Leave 201 pending` | self | validates end≥start |
@@ -384,6 +394,8 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | GET | `/managers` | — | `Manager[]` | exec | |
 | GET | `/managers/{id}` | — | `Manager` | exec,mall_manager | |
 | POST | `/managers` | ManagerCreate | `Manager 201` | exec | also links/creates User row for Google login by same email |
+| PUT | `/managers/{id}` | ManagerCreate | `Manager` | exec | **added**; can reassign to another mall |
+| DELETE | `/managers/{id}` | — | `204` | exec | **added**; `404` if missing |
 | GET | `/executives/{id}` | — | `Executive` | exec | |
 | GET | `/executives/{id}/malls` | — | `Mall[]` | exec | via oversees join |
 | GET | `/health` | — | `{status:UP}` | permit | |
@@ -396,7 +408,7 @@ Error shape (all failures): `{ timestamp, status, error, message, path }`. Valid
 
 - **Bids (`BidService.placeBid`, `@Transactional` + `PESSIMISTIC_WRITE` on BidEvent row):** reject if `event.status != open` (410/409) or `bid_amount < currentHighest + minimum_bid_increment` (400, message includes `min_next_bid`). `currentHighest = winning?.bid_amount ?? minimum_bid_amount` (mirrors `BidPage.jsx:31`). `round_number = count+1`. Flip previous `winning→outbid`, insert new `winning`. `bid_date = now()`. Resolve `store_id` from event (client does not send it). `bidder_name` defaults to Google name if absent.
 - **Finalize (`BidEventService.finalize`):** idempotent guard (409 if `status=finalized`). Sets `status=finalized`, `final_allocation=true`. Accepted `final_allocation` string is validated non-blank but discarded (logged + `Warning: 199 allocation-note-not-persisted` header) until migration.
-- **Tenant↔Store (`TenantService`):** create/update writes `StoreTenant` rows + flips `Store.status`; delete frees stores (`occupied→available` only if no other tenant holds them). All in one txn.
+- **Tenant↔Store (`TenantService`):** `create` inserts the tenant only; `linkStore`/`unlinkStore` add/delete a `StoreTenant` row and never touch `Store.status`. Both `DELETE /tenants/{id}` and `DELETE /stores/{id}` return `409` while a link exists — no cascading deletes.
 - **Attendance (`AttendanceService`):** PK `(employee_id,date)`. Check-in creates or 409 if `check_in_time` already set (stricter than mock's silent overwrite — prevents accidental double-tap wiping real clock-in; chosen deliberately). Check-out requires row + `check_in_time`, sets `check_out_time` (overwrite allowed once, second checkout 409).
 - **Leave:** `end_date ≥ start_date`, else 400. Only `pending` can transition; `approved|rejected` terminal.
 - **Product visibility:** `PUT` flips `StoreProduct.to_show` only (never creates Product).
@@ -510,7 +522,8 @@ Demo placeholder logins (work in BOTH modes; in `demo` mode no Google token need
 - `BidService.placeBid(eventId, PlaceBidRequest): BidResponse` — `@Transactional`, `bidEventRepo.findByIdForUpdate(eventId)`, validate, flip, insert.
 - `BidEventService.finalize(eventId, FinalizeRequest): BidEventResponse`.
 - `StoreService.toStoreResponse(Store): StoreResponse` — direct single-URL mapping, no split.
-- `TenantService.create(TenantCreateRequest): TenantResponse` — creates tenant + joins + flips store statuses.
+- `TenantService.create(TenantCreateRequest): TenantResponse` — inserts the tenant row only.
+- `TenantService.linkStore(tenantId, storeId)` / `unlinkStore(tenantId, storeId)` — add/delete a `StoreTenant` join row; `Store.status` untouched.
 - `AttendanceService.checkIn(empId)/checkOut(empId): AttendanceResponse`.
 - `GlobalExceptionHandler`: `ResourceNotFound→404, BadRequest→400, Conflict→409, Validation→422, AccessDenied→403, GoogleVerify→401`.
 

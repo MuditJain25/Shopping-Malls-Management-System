@@ -61,28 +61,26 @@ public class TenantService {
         t.setEmail(req.email());
         t.setPhoneNumber(req.phoneNumber());
         t.setDateRegistered(LocalDate.now());
-        t = tenants.save(t);
-        if (req.storeIds() != null) {
-            for (Integer storeId : req.storeIds()) {
-                var store = stores.findById(storeId).orElseThrow(() -> ApiException.notFound("Store"));
-                joins.save(new StoreTenant(storeId, t.getTenantId()));
-                store.setStatus("occupied");
-            }
-        }
-        return toResponse(t);
+        return toResponse(tenants.save(t));
     }
 
     @Transactional
     public void delete(Integer id) {
         var t = require(id);
-        List<Integer> owned = storeIds(id);
-        joins.findByIdTenantId(id).forEach(joins::delete);
-        tenants.delete(t);
-        for (Integer storeId : owned) {
-            if (!joins.existsByIdStoreId(storeId)) {
-                stores.findById(storeId).ifPresent(s -> s.setStatus("available"));
-            }
+        if (!joins.findByIdTenantId(id).isEmpty()) {
+            throw ApiException.conflict("Tenant is linked to one or more stores");
         }
+        tenants.delete(t);
+    }
+
+    @Transactional
+    public PeopleDtos.TenantResponse update(Integer id, PeopleDtos.TenantUpdateRequest req) {
+        var t = require(id);
+        t.setBusinessName(req.businessName());
+        t.setBusinessType(req.businessType());
+        t.setEmail(req.email());
+        t.setPhoneNumber(req.phoneNumber());
+        return toResponse(t);
     }
 
     public List<MallDtos.StoreResponse> storesByTenant(Integer tenantId) {
@@ -92,6 +90,25 @@ public class TenantService {
 
     public boolean ownsStore(Integer tenantId, Integer storeId) {
         return joins.existsByIdTenantIdAndIdStoreId(tenantId, storeId);
+    }
+
+    @Transactional
+    public PeopleDtos.TenantResponse linkStore(Integer tenantId, Integer storeId) {
+        var t = require(tenantId);
+        if (!stores.existsById(storeId)) throw ApiException.notFound("Store");
+        if (ownsStore(tenantId, storeId)) {
+            throw ApiException.conflict("Store already linked to this tenant");
+        }
+        joins.save(new StoreTenant(storeId, tenantId));
+        return toResponse(t);
+    }
+
+    @Transactional
+    public void unlinkStore(Integer tenantId, Integer storeId) {
+        require(tenantId);
+        var join = joins.findById(new StoreTenant.Id(storeId, tenantId))
+                .orElseThrow(() -> ApiException.notFound("Link"));
+        joins.delete(join);
     }
 
     public Page<PeopleDtos.EmployeeResponse> employeesByTenant(Integer tenantId, Pageable pageable) {

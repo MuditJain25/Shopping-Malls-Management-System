@@ -19,8 +19,11 @@ public final class PeopleDtos {
     }
 
     public record TenantCreateRequest(@NotBlank String businessName, String businessType,
-                                      @Email String email, String phoneNumber,
-                                      List<Integer> storeIds) {
+                                      @Email String email, String phoneNumber) {
+    }
+
+    public record TenantUpdateRequest(@NotBlank String businessName, String businessType,
+                                      @Email String email, String phoneNumber) {
     }
 
     public record EmployeeResponse(Integer employeeId, String firstName, String lastName,

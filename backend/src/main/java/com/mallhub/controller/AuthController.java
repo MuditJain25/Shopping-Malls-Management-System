@@ -2,6 +2,7 @@ package com.mallhub.controller;
 
 import com.mallhub.dto.AuthDtos;
 import com.mallhub.exception.ApiException;
+import com.mallhub.security.AuthPrincipal;
 import com.mallhub.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
@@ -39,7 +40,7 @@ public class AuthController {
 
     private String principalEmail() {
         Authentication a = SecurityContextHolder.getContext().getAuthentication();
-        if (a == null || !a.isAuthenticated() || "anonymousUser".equals(a.getPrincipal())) return null;
-        return a.getName();
+        if (a == null || !a.isAuthenticated()) return null;
+        return a.getPrincipal() instanceof AuthPrincipal p ? p.email() : null;
     }
 }

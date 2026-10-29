@@ -25,9 +25,23 @@ public class ManagerController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE') and @access.canAccessManager(#id)")
     public Object get(@PathVariable Integer id) {
         return managers.get(id);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('EXECUTIVE')")
+    public Object update(@PathVariable Integer id,
+                         @Valid @RequestBody PeopleDtos.ManagerCreateRequest req) {
+        return managers.update(id, req);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('EXECUTIVE')")
+    public void delete(@PathVariable Integer id) {
+        managers.delete(id);
     }
 
     @PostMapping

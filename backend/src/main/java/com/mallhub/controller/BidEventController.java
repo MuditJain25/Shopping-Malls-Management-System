@@ -28,7 +28,7 @@ public class BidEventController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE') and @access.canAccessStore(#req.storeId())")
     public Object create(@Valid @RequestBody BidDtos.BidEventCreateRequest req) {
         return bids.createEvent(req);
     }
@@ -48,15 +48,22 @@ public class BidEventController {
 
     @PostMapping("/{id}/bids")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER') and @access.isSelf(#req.userId())")
     public Object place(@PathVariable Integer id, @Valid @RequestBody BidDtos.PlaceBidRequest req) {
         return bids.placeBid(id, req);
     }
 
     @PutMapping("/{id}/finalize")
-    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE') and @access.canAccessEvent(#id)")
     public Object finalizeEvent(@PathVariable Integer id,
                                 @RequestBody(required = false) BidDtos.FinalizeRequest req) {
         return bids.finalizeEvent(id, req);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE') and @access.canAccessEvent(#id)")
+    public void delete(@PathVariable Integer id) {
+        bids.deleteEvent(id);
     }
 }

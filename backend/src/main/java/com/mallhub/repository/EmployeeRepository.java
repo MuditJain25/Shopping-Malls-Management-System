@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     Optional<Employee> findByEmail(String email);
 
+    boolean existsByMallId(Integer mallId);
+
     @Modifying
     @Query("UPDATE Employee e SET e.mallId = :mallId WHERE e.storeId = :storeId")
     int updateMallIdByStoreId(@Param("mallId") Integer mallId, @Param("storeId") Integer storeId);

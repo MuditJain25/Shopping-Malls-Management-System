@@ -9,4 +9,5 @@ public interface MallManagerRepository extends JpaRepository<MallManager, Intege
     Optional<MallManager> findByMallId(Integer mallId);
     boolean existsByMallId(Integer mallId);
     Optional<MallManager> findByEmail(String email);
+    boolean existsByMallId(Integer mallId);
 }

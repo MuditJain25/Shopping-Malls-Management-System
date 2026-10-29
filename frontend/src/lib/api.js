@@ -19,7 +19,10 @@
 //
 // ── Malls ───────────────────────────────────────────────────────
 //   GET    /api/malls?q=&city= → Mall[]
+//   POST   /api/malls → Mall 201
 //   GET    /api/malls/{id} → Mall
+//   PUT    /api/malls/{id} → Mall
+//   DELETE /api/malls/{id} → 204
 //   GET    /api/malls/{id}/stores → Store[]
 //   GET    /api/malls/nearest?lat=&lng=&limit= → Mall[]
 //   GET    /api/malls/{id}/products/top?storeId= → Product[]
@@ -48,6 +51,8 @@
 //   GET    /api/products?search= → Product[]
 //   GET    /api/products/{id} → Product
 //   POST   /api/products → Product 201
+//   PUT    /api/products/{id} → Product
+//   DELETE /api/products/{id} → 204
 //
 // ── Bid events & bids ───────────────────────────────────────────
 //   GET    /api/bid-events?status= → BidEvent[]
@@ -57,13 +62,17 @@
 //   GET    /api/bids?userId= → Bid[]
 //   POST   /api/bid-events/{id}/bids → Bid
 //   PUT    /api/bid-events/{id}/finalize → finalize winning bid
+//   DELETE /api/bid-events/{id} → 204
 //
 // ── Tenants ─────────────────────────────────────────────────────
 //   GET    /api/tenants?mallId= → Tenant[]
 //   GET    /api/tenants/{id} → Tenant
 //   POST   /api/tenants → Tenant 201
+//   PUT    /api/tenants/{id} → Tenant
 //   DELETE /api/tenants/{id} → 204
 //   GET    /api/tenants/{id}/stores → Store[]
+//   POST   /api/tenants/{id}/stores/{storeId} → Tenant 201
+//   DELETE /api/tenants/{id}/stores/{storeId} → 204
 //   GET    /api/tenants/{id}/employees → Employee[]
 //   POST   /api/tenants/{id}/employees → Employee 201
 //   GET    /api/tenants/{id}/transactions → FinancialTransaction[]
@@ -73,6 +82,7 @@
 // ── Employees ───────────────────────────────────────────────────
 //   POST   /api/employees → Employee 201
 //   GET    /api/employees/{id} → Employee
+//   PUT    /api/employees/{id} → Employee
 //   DELETE /api/employees/{id} → 204
 //   GET    /api/employees/{id}/leave-requests → LeaveRequest[]
 //   POST   /api/employees/{id}/leave-requests → LeaveRequest 201
@@ -87,6 +97,8 @@
 //   GET    /api/managers → MallManager[]
 //   GET    /api/managers/{id} → MallManager
 //   POST   /api/managers → MallManager 201
+//   PUT    /api/managers/{id} → MallManager
+//   DELETE /api/managers/{id} → 204
 //   GET    /api/executives/{id} → EnterpriseExecutive
 //   GET    /api/executives/{id}/malls → Mall[]
 //   GET    /api/transactions?mallId= → FinancialTransaction[]
@@ -282,8 +294,8 @@ export async function apiGetMallById(id) {
   return normalizeMall(data);
 }
 
-export async function apiCreateMall(mallData) {
-  const body = {
+function mallPayload(mallData) {
+  return {
     city: mallData.city,
     state: mallData.state,
     street: mallData.street,
@@ -299,17 +311,26 @@ export async function apiCreateMall(mallData) {
     opening_date: mallData.opening_date ?? mallData.openingDate ?? null,
     image_url: mallData.image_url ?? mallData.imageUrl ?? null,
   };
+}
+
+export async function apiCreateMall(mallData) {
   const data = await apiFetch("/malls", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify(mallPayload(mallData)),
+  });
+  return normalizeMall(data);
+}
+
+export async function apiUpdateMall(id, mallData) {
+  const data = await apiFetch(`/malls/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(mallPayload(mallData)),
   });
   return normalizeMall(data);
 }
 
 export async function apiDeleteMall(id) {
-  return apiFetch(`/malls/${id}`, {
-    method: "DELETE",
-  });
+  return apiFetch(`/malls/${id}`, { method: "DELETE" });
 }
 
 export async function apiGetNearestMalls(lat, lng, limit = 5) {
@@ -428,6 +449,18 @@ export async function apiCreateProduct(productData) {
   return normalizeProduct(data);
 }
 
+export async function apiUpdateProduct(id, productData) {
+  const data = await apiFetch(`/products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(productData),
+  });
+  return normalizeProduct(data);
+}
+
+export async function apiDeleteProduct(id) {
+  return apiFetch(`/products/${id}`, { method: "DELETE" });
+}
+
 export async function apiGetProductsByStore(storeId) {
   const data = await apiFetch(`/stores/${storeId}/products`);
   return unwrap(data).map(normalizeProduct);
@@ -524,6 +557,10 @@ export async function apiCreateBidEvent(eventData) {
   return normalizeBidEvent(data);
 }
 
+export async function apiDeleteBidEvent(eventId) {
+  return apiFetch(`/bid-events/${eventId}`, { method: "DELETE" });
+}
+
 // ── Tenants ────────────────────────────────────────────────────
 export async function apiGetTenants(mallId) {
   const qs = mallId ? `?mallId=${encodeURIComponent(mallId)}` : "";
@@ -546,8 +583,23 @@ export async function apiDeleteTenant(id) {
   return apiFetch(`/tenants/${id}`, { method: "DELETE" });
 }
 
+export async function apiUpdateTenant(id, tenantData) {
+  return apiFetch(`/tenants/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(tenantData),
+  });
+}
+
 export async function apiGetStoresByTenant(tenantId) {
   return apiFetch(`/tenants/${tenantId}/stores`);
+}
+
+export async function apiLinkTenantStore(tenantId, storeId) {
+  return apiFetch(`/tenants/${tenantId}/stores/${storeId}`, { method: "POST" });
+}
+
+export async function apiUnlinkTenantStore(tenantId, storeId) {
+  return apiFetch(`/tenants/${tenantId}/stores/${storeId}`, { method: "DELETE" });
 }
 
 export async function apiGetEmployeesByTenant(tenantId) {
@@ -578,6 +630,13 @@ export async function apiAddEmployee(employeeData) {
 
 export async function apiDeleteEmployee(id) {
   return apiFetch(`/employees/${id}`, { method: "DELETE" });
+}
+
+export async function apiUpdateEmployee(id, employeeData) {
+  return apiFetch(`/employees/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(employeeData),
+  });
 }
 
 export async function apiGetRevenueByTenant(tenantId) {
@@ -626,6 +685,17 @@ export async function apiGetManagerByMall(mallId) {
 export async function apiCreateManager(managerData) {
   return apiFetch("/managers", {
     method: "POST",
+    body: JSON.stringify(managerData),
+  });
+}
+
+export async function apiDeleteManager(id) {
+  return apiFetch(`/managers/${id}`, { method: "DELETE" });
+}
+
+export async function apiUpdateManager(id, managerData) {
+  return apiFetch(`/managers/${id}`, {
+    method: "PUT",
     body: JSON.stringify(managerData),
   });
 }

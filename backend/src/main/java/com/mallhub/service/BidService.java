@@ -142,6 +142,15 @@ public class BidService {
         return toResponse(event);
     }
 
+    @Transactional
+    public void deleteEvent(Integer eventId) {
+        BidEvent e = requireByEventId(eventId);
+        if (bids.countByEventIdAndStoreId(e.getId().getEventId(), e.getId().getStoreId()) > 0) {
+            throw ApiException.conflict("Bid event already has bids");
+        }
+        events.delete(e);
+    }
+
     BidDtos.BidEventResponse toResponse(BidEvent e) {
         BidEvent.Id key = e.getId();
         var winning = bids.findByEventIdAndStoreIdAndStatus(

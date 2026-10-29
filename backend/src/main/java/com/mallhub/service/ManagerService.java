@@ -57,6 +57,31 @@ public class ManagerService {
         return toResponse(managers.save(m));
     }
 
+    @Transactional
+    public PeopleDtos.ManagerResponse update(Integer id, PeopleDtos.ManagerCreateRequest req) {
+        var m = managers.findById(id).orElseThrow(() -> ApiException.notFound("Manager"));
+        if (!malls.existsById(req.mallId())) throw ApiException.notFound("Mall");
+        if (req.email() != null && !req.email().equals(m.getEmail())
+                && (managers.findByEmail(req.email()).isPresent()
+                || tenants.findByEmail(req.email()).isPresent()
+                || employees.findByEmail(req.email()).isPresent()
+                || executives.findByEmail(req.email()).isPresent())) {
+            throw ApiException.conflict("Email is already registered with another role");
+        }
+        m.setFirstName(req.firstName());
+        m.setLastName(req.lastName());
+        m.setEmail(req.email());
+        m.setPhoneNumber(req.phoneNumber());
+        m.setMallId(req.mallId());
+        return toResponse(m);
+    }
+
+    @Transactional
+    public void delete(Integer id) {
+        if (!managers.existsById(id)) throw ApiException.notFound("Manager");
+        managers.deleteById(id);
+    }
+
     static PeopleDtos.ManagerResponse toResponse(MallManager m) {
         return new PeopleDtos.ManagerResponse(m.getManagerId(), m.getFirstName(),
                 m.getLastName(), m.getEmail(), m.getDateJoined(), m.getPhoneNumber(), m.getMallId());

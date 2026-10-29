@@ -119,7 +119,7 @@ Each is an interface extending `JpaRepository<Entity, KeyType>`; method names be
 | `MallService` | `list(q, city)` search filter; `topProducts` = `to_show` links joined to product+store |
 | `StoreService` | `attachProduct` links an **existing** catalog product to a store (`404` unknown product, `409` if the pair already exists, `to_show` defaults `false`); product creation is separate (`POST /api/products`); `setVisibility` flips only; `detachProduct` removes only the link (`404` if absent); offers use per-store `MAX+1` ids |
 | `BidService` | Place-bid math + locking; finalize guard (see §7 trace 2) |
-| `TenantService` | `create` assigns stores (status → `occupied` + join rows); `delete` frees stores (→ `available` only if no other tenant holds them); transactions match `sender = business_name` |
+| `TenantService` | `create` inserts the tenant only; `linkStore`/`unlinkStore` add/delete join rows; `delete` refuses while stores are linked; transactions match `sender = business_name` |
 | `EmployeeService` | Leave: `end ≥ start`, only `pending` decidable, decision is `approved`/`rejected`; attendance: check-in creates today's row, second check-in → 409, check-out needs a check-in, second check-out → 409 |
 | `ManagerService` | `create` requires the mall to exist and the email to be unused in **all** role tables (email is the login key — it must resolve to exactly one role) |
 | `ExecutiveService` | Read-only (no executive creation endpoint — seeded only) |
