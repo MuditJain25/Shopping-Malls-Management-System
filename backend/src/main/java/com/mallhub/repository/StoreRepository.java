@@ -15,7 +15,6 @@ public interface StoreRepository extends JpaRepository<Store, Integer> {
 
     Page<Store> findByMallId(Integer mallId, Pageable pageable);
 
-    boolean existsByMallId(Integer mallId);
 
     Page<Store> findByMallIdAndStatus(Integer mallId, String status, Pageable pageable);
 

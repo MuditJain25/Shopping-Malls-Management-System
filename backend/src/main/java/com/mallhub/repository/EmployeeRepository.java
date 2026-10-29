@@ -21,7 +21,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
 
     Page<Employee> findByMallId(Integer mallId, Pageable pageable);
 
-    boolean existsByMallId(Integer mallId);
 
     Page<Employee> findByMallIdAndStoreId(Integer mallId, Integer storeId, Pageable pageable);
 
