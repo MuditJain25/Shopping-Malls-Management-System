@@ -62,10 +62,11 @@ public class StoreController {
 
     @GetMapping("/{id}/products")
     public Object products(@PathVariable Integer id,
+                           @RequestParam(required = false) Boolean toShow,
                            @RequestParam(required = false) Integer page,
                            @RequestParam(required = false) Integer size) {
         var p = Paging.pageable(page, size, "id.productId");
-        return Paging.shape(stores.productsByStore(id, p), page);
+        return Paging.shape(stores.productsByStore(id, toShow, p), page);
     }
 
     @PostMapping("/{id}/products/{productId}")

@@ -95,7 +95,7 @@ export default function SalaryView({ empId }) {
             { key: 'issue_date', label: 'Issue Date', render: p => <span className="text-slate-500">{p.issue_date}</span> },
             { key: 'download', label: '', render: p => (
               <button onClick={() => handleDownload(p)} className="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 font-medium">
-                <Download size={14} /> Download
+                <Download size={14} /> Download 
               </button>
             ) },
           ]}

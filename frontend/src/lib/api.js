@@ -461,8 +461,9 @@ export async function apiDeleteProduct(id) {
   return apiFetch(`/products/${id}`, { method: "DELETE" });
 }
 
-export async function apiGetProductsByStore(storeId) {
-  const data = await apiFetch(`/stores/${storeId}/products`);
+export async function apiGetProductsByStore(storeId, toShow) {
+  const qs = toShow ? "?toShow=true" : "";
+  const data = await apiFetch(`/stores/${storeId}/products${qs}`);
   return unwrap(data).map(normalizeProduct);
 }
 

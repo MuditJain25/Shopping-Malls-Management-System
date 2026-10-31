@@ -129,9 +129,11 @@ public class StoreService {
         return stores.findById(id).orElseThrow(() -> ApiException.notFound("Store"));
     }
 
-    public Page<MallDtos.ProductResponse> productsByStore(Integer storeId, Pageable pageable) {
+    public Page<MallDtos.ProductResponse> productsByStore(Integer storeId, Boolean toShow, Pageable pageable) {
         require(storeId);
-        Page<StoreProduct> page = links.findByIdStoreId(storeId, pageable);
+        Page<StoreProduct> page = Boolean.TRUE.equals(toShow)
+                ? links.findByIdStoreIdAndToShowTrue(storeId, pageable)
+                : links.findByIdStoreId(storeId, pageable);
         // One extra query for the whole page instead of one per link.
         Map<Integer, com.mallhub.entity.Product> byId = products
                 .findAllById(page.getContent().stream().map(l -> l.getId().getProductId()).toList())

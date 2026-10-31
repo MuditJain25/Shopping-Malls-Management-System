@@ -12,5 +12,7 @@ public interface StoreProductRepository extends JpaRepository<StoreProduct, Stor
 
     Page<StoreProduct> findByIdStoreId(Integer storeId, Pageable pageable);
 
+    Page<StoreProduct> findByIdStoreIdAndToShowTrue(Integer storeId, Pageable pageable);
+
     boolean existsByIdProductId(Integer productId);
 }

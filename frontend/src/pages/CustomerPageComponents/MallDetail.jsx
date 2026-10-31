@@ -61,7 +61,7 @@ export default function MallDetail({ mallId, user,navigate }) {
         setError("");
         const [store, sps] = await Promise.all([
           apiGetStoreById(selectedStore),
-          apiGetProductsByStore(selectedStore).catch(() => []),
+          apiGetProductsByStore(selectedStore, true).catch(() => []),
         ]);
         if (cancelled) return;
         setStoreProducts({ store, products: sps });
