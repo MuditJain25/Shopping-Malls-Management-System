@@ -82,18 +82,18 @@ const NAV_CONFIG = {
   executive: [
     { label: "Overview", path: "/app/executive", icon: Home },
     {
-      label: "Malls & Managers",
+      label: "Malls",
       path: "/app/executive/malls",
       icon: Building2,
+    },
+    {
+      label: "Managers",
+      path: "/app/executive/create-manager",
+      icon: User,
     },
     { label: "Tenants", path: "/app/executive/tenants", icon: Users },
     { label: "Bid Events", path: "/app/executive/bids", icon: Gavel },
     { label: "Analytics", path: "/app/executive/analytics", icon: BarChart3 },
-    {
-      label: "Create Manager",
-      path: "/app/executive/create-manager",
-      icon: User,
-    },
   ],
   employee: [
     { label: "Dashboard", path: "/app/employee", icon: Home },

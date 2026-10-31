@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Building2, Store } from "lucide-react";
+import { Plus, Trash2, Pencil, Building2, Store } from "lucide-react";
 
 import {
   PageHeader,
@@ -15,6 +15,7 @@ import {
   apiGetManagers,
   apiGetStores,
   apiCreateMall,
+  apiUpdateMall,
   apiDeleteMall,
 } from "@/lib/api.js";
 
@@ -38,6 +39,7 @@ export default function MallsView() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(EMPTY_MALL);
+  const [mallToEdit, setMallToEdit] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,7 +120,43 @@ export default function MallsView() {
     return name || "Mall Manager";
   };
 
-  const handleCreate = async (event) => {
+  const openAddModal = () => {
+    setMallToEdit(null);
+    setForm(EMPTY_MALL);
+    setFormError("");
+    setShowAdd(true);
+  };
+
+  const openEditModal = (mall) => {
+    setMallToEdit(mall);
+    setForm({
+      city: mall.city || "",
+      state: mall.state || "",
+      street:
+        mall.street ||
+        (mall.mall_name !== mall.city ? mall.mall_name : "") ||
+        "",
+      pincode: mall.pincode ?? mall.postal_code ?? "",
+      mall_area_sqft: mall.mall_area_sqft ?? mall.mallAreaSqft ?? "",
+      opening_date: mall.opening_date ?? mall.openingDate ?? "",
+      latitude: mall.latitude ?? "",
+      longitude: mall.longitude ?? "",
+      image_url: mall.image_url ?? mall.imageUrl ?? "",
+      description: mall.description || "",
+    });
+    setFormError("");
+    setShowAdd(true);
+  };
+
+  const closeAddModal = () => {
+    if (saving) return;
+
+    setShowAdd(false);
+    setMallToEdit(null);
+    setFormError("");
+  };
+
+  const handleSave = async (event) => {
     event.preventDefault();
 
     if (saving) return;
@@ -178,13 +216,21 @@ export default function MallsView() {
     setFormError("");
 
     try {
-      await apiCreateMall(mallData);
+      if (mallToEdit) {
+        await apiUpdateMall(mallToEdit.mall_id, mallData);
+      } else {
+        await apiCreateMall(mallData);
+      }
 
       setForm(EMPTY_MALL);
       setShowAdd(false);
+      setMallToEdit(null);
       setRefresh((previous) => previous + 1);
     } catch (err) {
-      setFormError(err.message || "Failed to create mall.");
+      setFormError(
+        err.message ||
+          (mallToEdit ? "Failed to update mall." : "Failed to create mall."),
+      );
     } finally {
       setSaving(false);
     }
@@ -238,24 +284,16 @@ export default function MallsView() {
   return (
     <div>
       <PageHeader
-        title="Malls & Managers"
-        subtitle="All malls and their assigned Mall Managers"
+        title="Malls"
+        subtitle="Manage malls and their details"
         action={
-          <button
-            type="button"
-            onClick={() => {
-              setFormError("");
-              setShowAdd(true);
-            }}
-            className="btn-primary"
-          >
+          <button type="button" onClick={openAddModal} className="btn-primary">
             <Plus size={16} />
             Add Mall
           </button>
         }
       />
 
-      {/* Malls and managers table */}
       <div className="card overflow-hidden">
         <DataTable
           columns={[
@@ -325,16 +363,29 @@ export default function MallsView() {
               key: "actions",
               label: "Actions",
               render: (mall) => (
-                <button
-                  type="button"
-                  onClick={() => openDeleteModal(mall)}
-                  disabled={deletingMallId !== null}
-                  title="Delete mall"
-                  aria-label={`Delete ${getMallName(mall)}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-red-500 hover:bg-red-50 disabled:opacity-50"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(mall)}
+                    disabled={saving || deletingMallId !== null}
+                    title="Update mall"
+                    aria-label={`Update ${getMallName(mall)}`}
+                    className="inline-flex items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    <Pencil size={14} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openDeleteModal(mall)}
+                    disabled={deletingMallId !== null || saving}
+                    title="Delete mall"
+                    aria-label={`Delete ${getMallName(mall)}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-red-500 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               ),
             },
           ]}
@@ -405,7 +456,6 @@ export default function MallsView() {
         </div>
       )}
 
-      {/* Custom Delete Mall confirmation modal */}
       <Modal
         open={!!mallToDelete}
         onClose={closeDeleteModal}
@@ -451,19 +501,13 @@ export default function MallsView() {
         )}
       </Modal>
 
-      {/* Add Mall modal */}
       <Modal
         open={showAdd}
-        onClose={() => {
-          if (!saving) {
-            setShowAdd(false);
-            setFormError("");
-          }
-        }}
-        title="Add Mall"
+        onClose={closeAddModal}
+        title={mallToEdit ? "Update Mall" : "Add Mall"}
         size="md"
       >
-        <form className="space-y-4" onSubmit={handleCreate}>
+        <form className="space-y-4" onSubmit={handleSave}>
           {formError && (
             <p className="text-sm text-red-600" role="alert">
               {formError}
@@ -586,10 +630,7 @@ export default function MallsView() {
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => {
-                setShowAdd(false);
-                setFormError("");
-              }}
+              onClick={closeAddModal}
               disabled={saving}
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -601,8 +642,14 @@ export default function MallsView() {
               disabled={saving}
               className="btn-primary disabled:opacity-50"
             >
-              <Plus size={16} />
-              {saving ? "Creating..." : "Create Mall"}
+              {mallToEdit ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving
+                ? mallToEdit
+                  ? "Updating..."
+                  : "Creating..."
+                : mallToEdit
+                  ? "Update Mall"
+                  : "Create Mall"}
             </button>
           </div>
         </form>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Pencil } from "lucide-react";
 
 import {
   PageHeader,
@@ -8,7 +8,15 @@ import {
   ErrorState,
 } from "@/components/ui/index.jsx";
 
-import { apiGetMalls, apiGetManagers, apiCreateManager } from "@/lib/api.js";
+import Modal from "@/components/ui/Modal.jsx";
+
+import {
+  apiGetMalls,
+  apiGetManagers,
+  apiCreateManager,
+  apiDeleteManager,
+  apiUpdateManager,
+} from "@/lib/api.js";
 
 const EMPTY_FORM = {
   first_name: "",
@@ -25,9 +33,16 @@ export default function CreateManagerView() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingManagerId, setDeletingManagerId] = useState(null);
+
+  const [showForm, setShowForm] = useState(false);
+  const [managerToEdit, setManagerToEdit] = useState(null);
+  const [managerToDelete, setManagerToDelete] = useState(null);
+
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
-  const [created, setCreated] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +62,9 @@ export default function CreateManagerView() {
         if (mallData.length > 0) {
           setForm((previous) => ({
             ...previous,
-            mall_id: previous.mall_id || String(mallData[0].mall_id),
+            mall_id:
+              previous.mall_id ||
+              String(mallData[0].mall_id ?? mallData[0].mallId),
           }));
         }
       } catch (err) {
@@ -69,49 +86,183 @@ export default function CreateManagerView() {
   }, []);
 
   useEffect(() => {
-    if (!created) return;
+    if (!successMessage) return;
 
     const timeoutId = setTimeout(() => {
-      setCreated(false);
+      setSuccessMessage("");
     }, 4000);
 
     return () => clearTimeout(timeoutId);
-  }, [created]);
+  }, [successMessage]);
 
-  const handleCreate = async (event) => {
+  const getManagerId = (manager) => manager.manager_id ?? manager.managerId;
+
+  const getManagerName = (manager) =>
+    [manager.first_name, manager.last_name].filter(Boolean).join(" ") ||
+    "Mall Manager";
+
+  const getManagerMall = (manager) =>
+    malls.find(
+      (mall) =>
+        String(mall.mall_id ?? mall.mallId) ===
+        String(manager.mall_id ?? manager.mallId),
+    );
+
+  const getMallName = (mall) =>
+    mall?.mall_name || mall?.street || mall?.city || "N/A";
+
+  const openAddModal = () => {
+    setManagerToEdit(null);
+    setActionError(null);
+    setSuccessMessage("");
+
+    setForm({
+      ...EMPTY_FORM,
+      mall_id: malls.length ? String(malls[0].mall_id ?? malls[0].mallId) : "",
+    });
+
+    setShowForm(true);
+  };
+
+  const openEditModal = (manager) => {
+    setManagerToEdit(manager);
+    setActionError(null);
+    setSuccessMessage("");
+
+    setForm({
+      first_name: manager.first_name || "",
+      last_name: manager.last_name || "",
+      email: manager.email || "",
+      phone_number: manager.phone_number ?? manager.phoneNumber ?? "",
+      mall_id: String(manager.mall_id ?? manager.mallId ?? ""),
+    });
+
+    setShowForm(true);
+  };
+
+  const closeFormModal = () => {
+    if (saving) return;
+
+    setShowForm(false);
+    setManagerToEdit(null);
+    setActionError(null);
+  };
+
+  const handleSave = async (event) => {
     event.preventDefault();
 
     if (saving) return;
 
+    const firstName = form.first_name.trim();
+    const lastName = form.last_name.trim();
+    const email = form.email.trim();
+
+    if (!firstName || !lastName || !email || !form.mall_id) {
+      setActionError("Please fill in all required fields.");
+      return;
+    }
+
+    const managerData = {
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone_number: form.phone_number.trim(),
+      mall_id: Number(form.mall_id),
+    };
+
     setSaving(true);
     setActionError(null);
-    setCreated(false);
+    setSuccessMessage("");
 
     try {
-      const managerData = {
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
-        email: form.email.trim(),
-        phone_number: form.phone_number.trim(),
-        mall_id: Number(form.mall_id),
-      };
+      if (managerToEdit) {
+        const managerId = getManagerId(managerToEdit);
+        const updatedManager = await apiUpdateManager(managerId, managerData);
 
-      const newManager = await apiCreateManager(managerData);
+        setManagers((previous) =>
+          previous.map((manager) =>
+            String(getManagerId(manager)) === String(managerId)
+              ? {
+                  ...manager,
+                  ...managerData,
+                  ...(updatedManager || {}),
+                }
+              : manager,
+          ),
+        );
 
-      if (newManager) {
-        setManagers((previous) => [...previous, newManager]);
+        setSuccessMessage("Manager details updated successfully!");
+      } else {
+        const newManager = await apiCreateManager(managerData);
+
+        if (newManager) {
+          setManagers((previous) => [...previous, newManager]);
+        }
+
+        setSuccessMessage("Manager account created successfully!");
       }
 
       setForm({
         ...EMPTY_FORM,
-        mall_id: malls.length ? String(malls[0].mall_id) : "",
+        mall_id: malls.length
+          ? String(malls[0].mall_id ?? malls[0].mallId)
+          : "",
       });
 
-      setCreated(true);
+      setShowForm(false);
+      setManagerToEdit(null);
     } catch (err) {
-      setActionError(err.message || "Failed to create manager account.");
+      setActionError(
+        err.message ||
+          (managerToEdit
+            ? "Failed to update manager."
+            : "Failed to create manager account."),
+      );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openDeleteModal = (manager) => {
+    setDeleteError(null);
+    setManagerToDelete(manager);
+  };
+
+  const closeDeleteModal = () => {
+    if (deletingManagerId !== null) return;
+
+    setManagerToDelete(null);
+    setDeleteError(null);
+  };
+
+  const handleDelete = async () => {
+    if (!managerToDelete || deletingManagerId !== null) return;
+
+    const managerId = getManagerId(managerToDelete);
+
+    if (managerId == null) {
+      setDeleteError("Manager ID is missing.");
+      return;
+    }
+
+    setDeletingManagerId(managerId);
+    setDeleteError(null);
+
+    try {
+      await apiDeleteManager(managerId);
+
+      setManagers((previous) =>
+        previous.filter(
+          (manager) => String(getManagerId(manager)) !== String(managerId),
+        ),
+      );
+
+      setManagerToDelete(null);
+      setSuccessMessage("Manager removed successfully!");
+    } catch (err) {
+      setDeleteError(err.message || "Failed to remove manager.");
+    } finally {
+      setDeletingManagerId(null);
     }
   };
 
@@ -126,31 +277,109 @@ export default function CreateManagerView() {
   return (
     <div>
       <PageHeader
-        title="Create New Manager"
-        subtitle="Add a new Mall Manager account with admin powers"
+        title="Managers"
+        subtitle="Manage all Mall Managers across malls"
+        action={
+          <button type="button" onClick={openAddModal} className="btn-primary">
+            <Plus size={16} />
+            Add Manager
+          </button>
+        }
       />
 
-      {created && (
+      {successMessage && (
         <div className="card p-3 mb-4 bg-green-50 border-green-200 flex items-center gap-2">
           <CheckCircle2 size={18} className="text-green-600" />
-          <span className="text-sm text-green-700">
-            Manager account created successfully!
-          </span>
+          <span className="text-sm text-green-700">{successMessage}</span>
         </div>
       )}
 
-      {actionError && (
-        <div
-          role="alert"
-          className="card p-3 mb-4 bg-red-50 border-red-200 text-sm text-red-700"
-        >
-          {actionError}
-        </div>
-      )}
+      <div className="card overflow-hidden">
+        <DataTable
+          columns={[
+            {
+              key: "name",
+              label: "Name",
+              render: (manager) => (
+                <span className="font-medium text-slate-800">
+                  {getManagerName(manager)}
+                </span>
+              ),
+            },
+            {
+              key: "email",
+              label: "Email",
+              render: (manager) => (
+                <span className="text-slate-600">{manager.email}</span>
+              ),
+            },
+            {
+              key: "mall",
+              label: "Mall",
+              render: (manager) => (
+                <span className="text-slate-600">
+                  {getManagerMall(manager)?.city || "N/A"}
+                </span>
+              ),
+            },
+            {
+              key: "joined",
+              label: "Joined",
+              render: (manager) => (
+                <span className="text-slate-500">
+                  {manager.date_joined || manager.dateJoined || "N/A"}
+                </span>
+              ),
+            },
+            {
+              key: "actions",
+              label: "Actions",
+              render: (manager) => (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(manager)}
+                    disabled={saving || deletingManagerId !== null}
+                    title="Update manager"
+                    aria-label={`Update ${getManagerName(manager)}`}
+                    className="inline-flex items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    <Pencil size={14} />
+                  </button>
 
-      <div className="card p-5 max-w-xl">
-        <form onSubmit={handleCreate}>
+                  <button
+                    type="button"
+                    onClick={() => openDeleteModal(manager)}
+                    disabled={saving || deletingManagerId !== null}
+                    title="Remove manager"
+                    aria-label={`Remove ${getManagerName(manager)}`}
+                    className="inline-flex items-center justify-center rounded-lg p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ),
+            },
+          ]}
+          rows={managers}
+          emptyMessage="No managers found."
+        />
+      </div>
+
+      <Modal
+        open={showForm}
+        onClose={closeFormModal}
+        title={managerToEdit ? "Update Mall Manager" : "Add Mall Manager"}
+        size="md"
+      >
+        <form onSubmit={handleSave}>
           <div className="space-y-4">
+            {actionError && (
+              <p className="text-sm text-red-600" role="alert">
+                {actionError}
+              </p>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label" htmlFor="manager-first-name">
@@ -248,8 +477,11 @@ export default function CreateManagerView() {
                 )}
 
                 {malls.map((mall) => (
-                  <option key={mall.mall_id} value={String(mall.mall_id)}>
-                    {mall.mall_name || mall.city || "Mall"}
+                  <option
+                    key={mall.mall_id ?? mall.mallId}
+                    value={String(mall.mall_id ?? mall.mallId)}
+                  >
+                    {getMallName(mall)}
                     {mall.city ? ` — ${mall.city}, ${mall.state}` : ""}
                   </option>
                 ))}
@@ -261,63 +493,63 @@ export default function CreateManagerView() {
               disabled={saving || malls.length === 0}
               className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Plus size={16} />
-              {saving ? "Creating Manager..." : "Create Manager Account"}
+              {managerToEdit ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving
+                ? managerToEdit
+                  ? "Updating Manager..."
+                  : "Creating Manager..."
+                : managerToEdit
+                  ? "Update Manager"
+                  : "Create Manager Account"}
             </button>
           </div>
         </form>
-      </div>
+      </Modal>
 
-      <h3 className="font-semibold text-slate-900 mt-8 mb-3">
-        Existing Managers
-      </h3>
+      <Modal
+        open={!!managerToDelete}
+        onClose={closeDeleteModal}
+        title="Remove Manager"
+        size="md"
+      >
+        {managerToDelete && (
+          <div className="space-y-5">
+            <p className="text-sm text-slate-600">
+              Remove{" "}
+              <span className="font-semibold text-slate-900">
+                {getManagerName(managerToDelete)}
+              </span>
+              ?
+            </p>
 
-      <div className="card overflow-hidden">
-        <DataTable
-          columns={[
-            {
-              key: "name",
-              label: "Name",
-              render: (manager) => (
-                <span className="font-medium text-slate-800">
-                  {manager.first_name} {manager.last_name}
-                </span>
-              ),
-            },
-            {
-              key: "email",
-              label: "Email",
-              render: (manager) => (
-                <span className="text-slate-600">{manager.email}</span>
-              ),
-            },
-            {
-              key: "mall",
-              label: "Mall",
-              render: (manager) => {
-                const mall = malls.find(
-                  (item) => String(item.mall_id) === String(manager.mall_id),
-                );
+            {deleteError && (
+              <p className="text-sm text-red-600" role="alert">
+                {deleteError}
+              </p>
+            )}
 
-                return (
-                  <span className="text-slate-600">{mall?.city || "N/A"}</span>
-                );
-              },
-            },
-            {
-              key: "joined",
-              label: "Joined",
-              render: (manager) => (
-                <span className="text-slate-500">
-                  {manager.date_joined || "N/A"}
-                </span>
-              ),
-            },
-          ]}
-          rows={managers}
-          emptyMessage="No managers found."
-        />
-      </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={deletingManagerId !== null}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deletingManagerId !== null}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingManagerId !== null ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
