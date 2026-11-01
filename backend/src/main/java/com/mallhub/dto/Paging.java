@@ -19,7 +19,10 @@ public final class Paging {
      *                    unordered query returns overlapping and missing rows across pages.
      */
     public static Pageable pageable(Integer page, Integer size, String defaultSort) {
-        Sort sort = Sort.by(defaultSort);
+        return pageable(page, size, Sort.by(defaultSort));
+    }
+
+    public static Pageable pageable(Integer page, Integer size, Sort sort) {
         return page == null
                 ? PageRequest.of(0, Integer.MAX_VALUE, sort)
                 : PageRequest.of(page, clamp(size), sort);

@@ -108,6 +108,7 @@
 //   GET    /api/transactions → FinancialTransaction[]
 //   POST   /api/transactions → FinancialTransaction 201
 //   PUT    /api/transactions/{id} → FinancialTransaction
+//   DELETE /api/transactions/{id} → 204
 // ═══════════════════════════════════════════════════════════════
 
 import * as mock from "./mockData.js";
@@ -701,6 +702,17 @@ export async function apiCreateTransaction(transactionData) {
     method: "POST",
     body: JSON.stringify(transactionData),
   });
+}
+
+export async function apiUpdateTransaction(id, transactionData) {
+  return apiFetch(`/transactions/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(transactionData),
+  });
+}
+
+export async function apiDeleteTransaction(id) {
+  return apiFetch(`/transactions/${id}`, { method: "DELETE" });
 }
 
 // ── Mall Employees ─────────────────────────────────────────────

@@ -6,6 +6,7 @@ import com.mallhub.exception.ApiException;
 import com.mallhub.security.Access;
 import com.mallhub.service.EmployeeService;
 import com.mallhub.service.TenantService;
+import com.mallhub.service.TransactionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -102,7 +103,7 @@ public class TenantController {
     public Object transactions(@PathVariable Integer id,
                                @RequestParam(required = false) Integer page,
                                @RequestParam(required = false) Integer size) {
-        var p = Paging.pageable(page, size, "transactionId");
+        var p = Paging.pageable(page, size, TransactionService.NEWEST_FIRST);
         return Paging.shape(tenants.transactionsByTenant(id, p), page);
     }
 

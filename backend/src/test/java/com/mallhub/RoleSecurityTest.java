@@ -373,6 +373,35 @@ class RoleSecurityTest {
     }
 
     @Test
+    void onlyManagerAndExecutiveCanDeleteTransaction() throws Exception {
+        for (String role : new String[]{"tenant", "shop_manager", "customer"}) {
+            mvc.perform(delete("/api/transactions/1").header("Authorization", auth(role, 1)))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(delete("/api/transactions/1").header("Authorization", auth("mall_manager", 1)))
+                .andExpect(status().isNoContent());
+        mvc.perform(delete("/api/transactions/1").header("Authorization", auth("mall_manager", 1)))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/transactions/99999").header("Authorization", auth("executive", 1)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void transactionsAreListedNewestFirst() throws Exception {
+        send(post("/api/transactions"), "executive", 1,
+                "{\"amount\":1,\"sender\":\"Order Co\",\"transaction_date\":\"2030-01-01\"}")
+                .andExpect(status().isCreated());
+        send(post("/api/transactions"), "executive", 1,
+                "{\"amount\":2,\"sender\":\"Order Co\",\"transaction_date\":\"2030-02-01\"}")
+                .andExpect(status().isCreated());
+        mvc.perform(get("/api/transactions").header("Authorization", auth("executive", 1)))
+                .andExpect(jsonPath("$[0].transaction_date").value("2030-02-01"))
+                .andExpect(jsonPath("$[1].transaction_date").value("2030-01-01"));
+        mvc.perform(get("/api/transactions?page=0&size=2").header("Authorization", auth("executive", 1)))
+                .andExpect(jsonPath("$.content[0].transaction_date").value("2030-02-01"));
+    }
+
+    @Test
     void operatingRolesCanListTransactionsButCustomerCannot() throws Exception {
         for (String role : new String[]{"tenant", "shop_manager", "mall_manager", "executive"}) {
             mvc.perform(get("/api/transactions").header("Authorization", auth(role, 1)))

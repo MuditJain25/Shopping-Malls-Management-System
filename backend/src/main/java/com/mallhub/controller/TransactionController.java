@@ -21,7 +21,7 @@ public class TransactionController {
     @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER','EXECUTIVE')")
     public Object list(@RequestParam(required = false) Integer page,
                        @RequestParam(required = false) Integer size) {
-        return Paging.shape(transactions.list(Paging.pageable(page, size, "transactionId")), page);
+        return Paging.shape(transactions.list(Paging.pageable(page, size, TransactionService.NEWEST_FIRST)), page);
     }
 
     @PostMapping
@@ -36,5 +36,12 @@ public class TransactionController {
     public Object update(@PathVariable Integer id,
                          @Valid @RequestBody PeopleDtos.TransactionRequest req) {
         return transactions.update(id, req);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('MALL_MANAGER','EXECUTIVE')")
+    public void delete(@PathVariable Integer id) {
+        transactions.delete(id);
     }
 }

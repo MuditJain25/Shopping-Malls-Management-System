@@ -6,6 +6,7 @@ import com.mallhub.exception.ApiException;
 import com.mallhub.repository.TransactionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,10 @@ import java.time.LocalDate;
 // A plain ledger: sender/receiver are raw account values, so rows carry no mall link.
 @Service
 public class TransactionService {
+    /** Newest first; id breaks date ties so paging stays stable. */
+    public static final Sort NEWEST_FIRST =
+            Sort.by(Sort.Direction.DESC, "transactionDate", "transactionId");
+
     private final TransactionRepository transactions;
 
     public TransactionService(TransactionRepository transactions) {
@@ -39,6 +44,12 @@ public class TransactionService {
         apply(tx, req);
         if (tx.getTransactionDate() == null) tx.setTransactionDate(keep);
         return TenantService.toResponse(tx);
+    }
+
+    @Transactional
+    public void delete(Integer id) {
+        var tx = transactions.findById(id).orElseThrow(() -> ApiException.notFound("Transaction"));
+        transactions.delete(tx);
     }
 
     private static void apply(FinancialTransaction tx, PeopleDtos.TransactionRequest req) {

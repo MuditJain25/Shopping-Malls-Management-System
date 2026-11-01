@@ -385,10 +385,11 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | DELETE | `/tenants/{id}/revenue/{infoId}` | — | `204` | tenant | own reports only, no time limit (table has no date); 404 if missing |
 | GET | `/tenants/{id}/malls` | — | `Mall[]` | tenant(self),mall_manager,exec | distinct malls of the tenant's linked stores, one SQL query |
 | GET | `/revenue` | `?mallId=&page=&size=` | `Revenue[]` | exec,mall_manager | all reports, `{tenant_id,information_id,description}` only (no store/date/name); exec: all or `mallId`; manager: tenants renting in own mall |
-| GET | `/tenants/{id}/transactions` | — | `Txn[]` | tenant | `sender = tenant.business_name` |
-| GET | `/transactions` | — | `Txn[]` | tenant,shop_manager,mall_manager,exec | all rows (no per-row owner); `?mallId=` removed — sender/receiver are account values, not mall ids |
+| GET | `/tenants/{id}/transactions` | — | `Txn[]` | tenant | `sender = tenant.business_name`; newest first |
+| GET | `/transactions` | — | `Txn[]` | tenant,shop_manager,mall_manager,exec | all rows, newest first (`transaction_date` desc, `transaction_id` desc; no per-row owner); `?mallId=` removed — sender/receiver are account values, not mall ids |
 | POST | `/transactions` | `{amount,sender,receiver,sender_type,receiver_type,transaction_date,remarks}` | `Txn 201` | tenant,shop_manager,mall_manager,exec | only `amount` required; date defaults to today |
 | PUT | `/transactions/{id}` | as POST | `Txn` | mall_manager,exec | full replace; null date keeps existing |
+| DELETE | `/transactions/{id}` | — | `204` | mall_manager,exec | hard delete; 404 if missing |
 | POST | `/employees` | EmployeeCreate | `Employee 201` | tenant,shop_manager,mall_manager,exec | `store_id` optional: `store_id` → store staff (mall derived); `mall_id` alone → mall-only staff; neither → 400 |
 | GET | `/employees/{id}` | — | `Employee` | self,manager,tenant | |
 | PUT | `/employees/{id}` | EmployeeCreate | `Employee` | tenant,shop_manager,mall_manager,exec | **added**; may move store (and follows its mall); omitting `store_id` with `mall_id` makes mall-only staff |
