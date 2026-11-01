@@ -91,7 +91,7 @@ const NAV_CONFIG = {
     { label: "Analytics", path: "/app/executive/analytics", icon: BarChart3 },
     {
       label: "Revenue Reports",
-      path: "/app/mall-manager/revenue-reports",
+      path: "/app/executive/revenue-reports",
       icon: CalendarCheck,
     },
   ],

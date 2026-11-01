@@ -6,7 +6,7 @@ import {
   apiGetTransactionsByTenant,
   apiCreateTransaction,
   apiGetMallsByTenant,
-  // apiDeleteTransaction,
+  apiDeleteTransaction,
 } from "@/lib/api.js";
 
 const REMARK_PREVIEW_LENGTH = 55;
@@ -19,7 +19,6 @@ function getTodayLocalDate() {
     .slice(0, 10);
 }
 
-// Remove the date metadata before displaying remarks.
 function getDisplayRemarks(remarks) {
   const lines = String(remarks || "").split(/\r?\n/);
 
@@ -55,12 +54,10 @@ export default function TransactionsView({ tenantId, tenantName }) {
 
   const [selectedRemark, setSelectedRemark] = useState(null);
 
-  // Transaction deletion state.
   const [transactionToDelete, setTransactionToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  // Fetch tenant transactions.
   const fetchTransactions = useCallback(async () => {
     if (tenantId == null) {
       setError("Tenant information is unavailable.");
@@ -74,7 +71,6 @@ export default function TransactionsView({ tenantId, tenantName }) {
 
       const data = await apiGetTransactionsByTenant(tenantId);
 
-      // API already unwraps and normalizes the response.
       setTransactions(data);
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
@@ -84,7 +80,6 @@ export default function TransactionsView({ tenantId, tenantName }) {
     }
   }, [tenantId]);
 
-  // Fetch malls associated with this tenant.
   const fetchMalls = useCallback(async () => {
     if (tenantId == null) {
       setMallsError("Tenant information is unavailable.");
@@ -98,7 +93,6 @@ export default function TransactionsView({ tenantId, tenantName }) {
 
       const data = await apiGetMallsByTenant(tenantId);
 
-      // API already unwraps and normalizes the response.
       setMalls(data);
     } catch (err) {
       console.error("Failed to fetch tenant malls:", err);
@@ -195,7 +189,6 @@ export default function TransactionsView({ tenantId, tenantName }) {
     setTransactionToDelete(transaction);
   };
 
-  // Delete transaction.
   const handleDelete = async () => {
     if (!transactionToDelete) return;
 
@@ -203,11 +196,10 @@ export default function TransactionsView({ tenantId, tenantName }) {
       setDeleting(true);
       setDeleteError("");
 
-      // await apiDeleteTransaction(transactionToDelete.transaction_id);
+      await apiDeleteTransaction(transactionToDelete.transaction_id);
 
       setTransactionToDelete(null);
 
-      // Refresh the transaction list.
       await fetchTransactions();
     } catch (err) {
       console.error("Failed to delete transaction:", err);
@@ -217,27 +209,11 @@ export default function TransactionsView({ tenantId, tenantName }) {
     }
   };
 
-  // Sort newest transactions first and assign serial numbers.
   const displayTransactions = useMemo(() => {
-    return [...transactions]
-      .sort((a, b) => {
-        const dateA = Date.parse(a.transaction_date);
-        const dateB = Date.parse(b.transaction_date);
-
-        const timestampA = Number.isFinite(dateA)
-          ? dateA
-          : Number.NEGATIVE_INFINITY;
-
-        const timestampB = Number.isFinite(dateB)
-          ? dateB
-          : Number.NEGATIVE_INFINITY;
-
-        return timestampB - timestampA;
-      })
-      .map((transaction, index) => ({
-        ...transaction,
-        serial_no: index + 1,
-      }));
+    return [...transactions].map((transaction, index) => ({
+      ...transaction,
+      serial_no: index + 1,
+    }));
   }, [transactions]);
 
   return (
