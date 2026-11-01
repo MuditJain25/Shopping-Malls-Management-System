@@ -1,81 +1,165 @@
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { PageHeader, DataTable } from '@/components/ui/index.jsx';
-import Modal from '@/components/ui/Modal.jsx';
-import { getRevenueByTenant, revenueInfo } from '@/lib/mockData.js';
+import { useState, useEffect, useCallback } from "react";
+import { Plus } from "lucide-react";
+import { PageHeader, DataTable } from "@/components/ui/index.jsx";
+import Modal from "@/components/ui/Modal.jsx";
+import { apiGetRevenueByTenant, apiSubmitRevenue } from "@/lib/api.js";
 
 export default function RevenueView({ tenantId }) {
   const [showSubmit, setShowSubmit] = useState(false);
-  const [newReport, setNewReport] = useState({ description: '', month: '', amount: '' });
-  const [refresh, setRefresh] = useState(0);
+  const [description, setDescription] = useState("");
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const reports = getRevenueByTenant(tenantId);
-  const totalRevenue = reports.reduce((sum, r) => sum + r.amount, 0);
+  const fetchReports = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await apiGetRevenueByTenant(tenantId);
+      setReports(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch revenue reports:", err);
+      setError(err.message || "Failed to load revenue reports.");
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   const handleSubmit = async () => {
-    revenueInfo.push({
-      tenant_id: tenantId,
-      information_id: `ri${Date.now()}`,
-      description: newReport.description,
-      month: newReport.month,
-      amount: parseFloat(newReport.amount),
-      submitted_date: new Date().toISOString().split('T')[0],
-    });
-    setShowSubmit(false);
-    setNewReport({ description: '', month: '', amount: '' });
-    setRefresh(r => r + 1);
+    if (!description.trim()) {
+      setError("Please enter a description.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError("");
+
+      await apiSubmitRevenue(tenantId, {
+        description: description.trim(),
+      });
+
+      setDescription("");
+      setShowSubmit(false);
+
+      await fetchReports();
+    } catch (err) {
+      console.error("Failed to submit revenue report:", err);
+      setError(err.message || "Failed to submit revenue report.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div key={refresh}>
+    <div>
       <PageHeader
         title="Revenue Reports"
         subtitle="Share revenue information with the mall"
-        action={<button onClick={() => setShowSubmit(true)} className="btn-primary text-sm"><Plus size={16} /> Submit Report</button>}
+        action={
+          <button
+            onClick={() => {
+              setError("");
+              setShowSubmit(true);
+            }}
+            className="btn-primary text-sm"
+          >
+            <Plus size={16} /> Submit Report
+          </button>
+        }
       />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="card p-4">
-          <p className="text-sm text-slate-500 mb-1">Total Revenue Reported</p>
-          <p className="text-xl font-bold text-slate-900">${totalRevenue.toLocaleString()}</p>
-        </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="card p-4">
           <p className="text-sm text-slate-500 mb-1">Reports Submitted</p>
-          <p className="text-xl font-bold text-slate-900">{reports.length}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-slate-500 mb-1">Avg Monthly Revenue</p>
-          <p className="text-xl font-bold text-slate-900">${reports.length ? Math.round(totalRevenue / reports.length).toLocaleString() : 0}</p>
+          <p className="text-xl font-bold text-slate-900">
+            {loading ? "..." : reports.length}
+          </p>
         </div>
       </div>
+
+      {error && !showSubmit && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+          {error}
+        </div>
+      )}
 
       <div className="card overflow-hidden">
-        <DataTable
-          columns={[
-            { key: 'month', label: 'Month', render: r => <span className="font-medium text-slate-800">{r.month}</span> },
-            { key: 'description', label: 'Description', render: r => <span className="text-slate-600">{r.description}</span> },
-            { key: 'amount', label: 'Amount', render: r => <span className="font-semibold text-green-600">${r.amount.toLocaleString()}</span> },
-            { key: 'submitted_date', label: 'Submitted', render: r => <span className="text-slate-500">{r.submitted_date}</span> },
-          ]}
-          rows={reports}
-          emptyMessage="No revenue reports submitted yet."
-        />
+        {loading ? (
+          <div className="p-6 text-center text-slate-500">
+            Loading revenue reports...
+          </div>
+        ) : error ? (
+          <div className="p-6 text-center text-red-500">
+            {error}
+            <button
+              onClick={fetchReports}
+              className="block mx-auto mt-3 text-blue-600 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              {
+                key: "description",
+                label: "Description",
+                render: (r) => (
+                  <span className="text-slate-700">{r.description}</span>
+                ),
+              },
+              {
+                key: "submitted_date",
+                label: "Submitted",
+                render: (r) => (
+                  <span className="text-slate-500">
+                    {r.submitted_date || "-"}
+                  </span>
+                ),
+              },
+            ]}
+            rows={reports}
+            emptyMessage="No revenue reports submitted yet."
+          />
+        )}
       </div>
 
-      <Modal open={showSubmit} onClose={() => setShowSubmit(false)} title="Submit Revenue Report" size="md">
+      <Modal
+        open={showSubmit}
+        onClose={() => {
+          if (!submitting) setShowSubmit(false);
+        }}
+        title="Submit Revenue Report"
+        size="md"
+      >
         <div className="space-y-4">
           <div>
-            <label className="label">Month</label>
-            <input className="input" value={newReport.month} onChange={e => setNewReport({ ...newReport, month: e.target.value })} placeholder="e.g. September 2026" />
-          </div>
-          <div>
             <label className="label">Description</label>
-            <input className="input" value={newReport.description} onChange={e => setNewReport({ ...newReport, description: e.target.value })} placeholder="e.g. September 2026 revenue report" />
+            <textarea
+              className="input min-h-24"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. September 2026 revenue report"
+              disabled={submitting}
+            />
           </div>
-          <div>
-            <label className="label">Revenue Amount ($)</label>
-            <input type="number" className="input" value={newReport.amount} onChange={e => setNewReport({ ...newReport, amount: e.target.value })} />
-          </div>
-          <button onClick={handleSubmit} className="btn-primary w-full">Submit Report</button>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || !description.trim()}
+            className="btn-primary w-full disabled:opacity-50"
+          >
+            {submitting ? "Submitting..." : "Submit Report"}
+          </button>
         </div>
       </Modal>
     </div>

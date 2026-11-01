@@ -74,6 +74,11 @@ const NAV_CONFIG = {
       icon: FileText,
     },
     {
+      label: "Revenue Reports",
+      path: "/app/mall-manager/revenue-reports",
+      icon: CalendarCheck,
+    },
+    {
       label: "Bidding Control",
       path: "/app/mall-manager/bidding",
       icon: Gavel,
