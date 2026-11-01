@@ -9,7 +9,9 @@ import {
   apiGetAvailableStores,
   apiGetStoreById,
   apiGetProductsByStore,
+  apiGetStoreOffers,
 } from "@/lib/api.js";
+import OfferList from "@/components/OfferList.jsx";
 
 export default function MallDetail({ mallId, user,navigate }) {
   // const { navigate } = useRouter();
@@ -59,12 +61,13 @@ export default function MallDetail({ mallId, user,navigate }) {
     (async () => {
       try {
         setError("");
-        const [store, sps] = await Promise.all([
+        const [store, sps, offers] = await Promise.all([
           apiGetStoreById(selectedStore),
           apiGetProductsByStore(selectedStore, true).catch(() => []),
+          apiGetStoreOffers(selectedStore).catch(() => []),
         ]);
         if (cancelled) return;
-        setStoreProducts({ store, products: sps });
+        setStoreProducts({ store, products: sps, offers });
       } catch (err) {
         if (!cancelled) setError(err.message || "Failed to load store");
       }
@@ -221,6 +224,7 @@ export default function MallDetail({ mallId, user,navigate }) {
                         ${Number(price || 0).toFixed(2)}
                       </p>
                     </div>
+                    <OfferList offers={storeProducts?.offers} />
                   </div>
                 </div>
               );

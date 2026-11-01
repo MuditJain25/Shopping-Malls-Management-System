@@ -13,7 +13,7 @@ import Modal from "@/components/ui/Modal.jsx";
 import {
   apiGetMalls,
   apiGetManagers,
-  apiGetStores,
+  apiGetCounts,
   apiCreateMall,
   apiUpdateMall,
   apiDeleteMall,
@@ -35,7 +35,7 @@ const EMPTY_MALL = {
 export default function MallsView() {
   const [malls, setMalls] = useState([]);
   const [managers, setManagers] = useState([]);
-  const [stores, setStores] = useState([]);
+  const [storeCounts, setStoreCounts] = useState([]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(EMPTY_MALL);
@@ -60,17 +60,17 @@ export default function MallsView() {
       setLoadError("");
 
       try {
-        const [mallData, managerData, storeData] = await Promise.all([
+        const [mallData, managerData, countData] = await Promise.all([
           apiGetMalls(),
           apiGetManagers().catch(() => []),
-          apiGetStores().catch(() => []),
+          apiGetCounts({ include: ["stores"], groupBy: "mall" }).catch(() => []),
         ]);
 
         if (cancelled) return;
 
         setMalls(mallData);
         setManagers(managerData);
-        setStores(storeData);
+        setStoreCounts(countData);
       } catch (err) {
         if (!cancelled) {
           setLoadError(err.message || "Failed to load malls.");
@@ -105,9 +105,8 @@ export default function MallsView() {
     );
 
   const getMallStoreCount = (mallId) =>
-    stores.filter(
-      (store) => String(store.mall_id ?? store.mallId) === String(mallId),
-    ).length;
+    storeCounts.find((row) => String(row.mall_id) === String(mallId))?.stores ??
+    0;
 
   const getManagerName = (manager) => {
     if (!manager) return "—";

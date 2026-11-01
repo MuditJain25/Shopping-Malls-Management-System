@@ -9,7 +9,9 @@ import {
   apiDetachProduct,
   apiGetProductsByStore,
   apiToggleProductVisibility,
+  apiGetStoreOffers,
 } from "@/lib/api";
+import OfferList from "@/components/OfferList.jsx";
 
 export default function ProductsView({ stores }) {
   const [selectedStore, setSelectedStore] = useState(stores[0]?.store_id || "");
@@ -27,6 +29,7 @@ export default function ProductsView({ stores }) {
   const [unlinkingProduct, setUnlinkingProduct] = useState(false);
   const [unlinkError, setUnlinkError] = useState("");
   const [storeProducts, setStoreProducts] = useState([]);
+  const [storeOffers, setStoreOffers] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -45,6 +48,13 @@ export default function ProductsView({ stores }) {
     let cancelled = false;
 
     setStoreProducts([]);
+    setStoreOffers([]);
+
+    apiGetStoreOffers(storeId)
+      .then((data) => {
+        if (!cancelled) setStoreOffers(data);
+      })
+      .catch((error) => console.error("Failed to load store offers", error));
 
     apiGetProductsByStore(storeId)
       .then((data) => {
@@ -373,6 +383,8 @@ export default function ProductsView({ stores }) {
                   Delete
                 </button>
               </div>
+
+              <OfferList offers={storeOffers} />
             </div>
           </div>
         ))}

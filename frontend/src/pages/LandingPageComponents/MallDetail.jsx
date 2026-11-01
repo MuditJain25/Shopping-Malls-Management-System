@@ -1,6 +1,7 @@
 ﻿import React, { useState } from "react";
 import { ChevronRight, MapPin, Building2 } from "lucide-react";
 import { Badge, ErrorState, EmptyState } from "@/components/ui/index.jsx";
+import OfferList from "@/components/OfferList.jsx";
 
 export default function MallDetail({
   mall,
@@ -11,6 +12,7 @@ export default function MallDetail({
   selectedCategory,
   setSelectedCategory,
   categoryProducts,
+  offers,
   onBack,
   onExploreProperties,
 }) {
@@ -180,6 +182,7 @@ export default function MallDetail({
                       {product.store?.store_name}
                     </p>
                   </div>
+                  <OfferList offers={offers?.filter((o) => o.store_id === product.store?.store_id)} />
                 </div>
               </div>
             ))

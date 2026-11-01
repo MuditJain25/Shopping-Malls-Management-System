@@ -6,7 +6,6 @@ import {
   apiGetEmployeesByTenant,
   apiGetEmployeesByStore,
   apiGetProductsByStore,
-  apiGetTransactionsByTenant,
   apiGetMallById,
 } from "@/lib/api";
 
@@ -17,7 +16,6 @@ export default function Overview({ role, stores, tenantId }) {
 
   const [employees, setEmployees] = useState([]);
   const [products, setProducts] = useState([]);
-  const [transactions, setTransactions] = useState([]);
   const [malls, setMalls] = useState({});
 
   useEffect(() => {
@@ -87,33 +85,6 @@ export default function Overview({ role, stores, tenantId }) {
   }, [stores]);
 
   useEffect(() => {
-    if (isShopManager || !tenantId) {
-      setTransactions([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    apiGetTransactionsByTenant(tenantId)
-      .then((data) => {
-        if (!cancelled) {
-          setTransactions(
-            Array.isArray(data) ? data : (data?.content ?? data?.items ?? []),
-          );
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.error("Failed to load tenant transactions:", error);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isShopManager, tenantId]);
-
-  useEffect(() => {
     if (stores.length === 0) return;
 
     let cancelled = false;
@@ -147,7 +118,6 @@ export default function Overview({ role, stores, tenantId }) {
   }, [stores]);
 
   const topProducts = products.filter((product) => product.to_show);
-  const totalRevenue = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <div>
@@ -188,20 +158,6 @@ export default function Overview({ role, stores, tenantId }) {
           color="warning"
         />
       </div>
-
-      {!isShopManager && (
-        <div className="card p-5 mb-6">
-          <h3 className="font-semibold text-slate-900 text-sm mb-2">
-            Total Rent Paid
-          </h3>
-          <p className="text-2xl font-bold text-slate-900">
-            ${totalRevenue.toLocaleString()}
-          </p>
-          <p className="text-sm text-slate-500 mt-1">
-            {transactions.length} transactions
-          </p>
-        </div>
-      )}
 
       <h3 className="font-semibold text-slate-900 mb-4">
         {isShopManager ? "Your Store" : "Your Stores"}

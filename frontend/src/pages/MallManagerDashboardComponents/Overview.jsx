@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Store, Users, Gavel, Building2 } from 'lucide-react';
 import { PageHeader, StatCard, Badge, EmptyState, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import {
-  apiGetMallById, apiGetStoresByMall, apiGetEmployeesByMall,
-  apiGetBidEventsByMall, apiGetTenants
+  apiGetMallById, apiGetStoresByMall, apiGetCounts,
+  apiGetBidEventsByMall
 } from '@/lib/api.js';
 
 function mallDisplayName(city) {
@@ -20,12 +20,11 @@ export default function Overview({ mallId, manager }) {
     Promise.all([
       apiGetMallById(mallId),
       apiGetStoresByMall(mallId),
-      apiGetEmployeesByMall(mallId),
+      apiGetCounts({ mallId, include: ['stores', 'employees', 'tenants'] }),
       apiGetBidEventsByMall(mallId),
-      apiGetTenants(mallId),
     ])
-      .then(([mall, mallStores, mallEmps, events, mallTenants]) => {
-        if (!cancelled) setData({ mall, mallStores, mallEmps, events, mallTenants });
+      .then(([mall, mallStores, counts, events]) => {
+        if (!cancelled) setData({ mall, mallStores, counts, events });
       })
       .catch(err => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
@@ -34,7 +33,7 @@ export default function Overview({ mallId, manager }) {
   if (error) return <ErrorState message={error} />;
   if (!data) return <LoadingSpinner label="Loading overview..." />;
 
-  const { mall, mallStores, mallEmps, events, mallTenants } = data;
+  const { mall, mallStores, counts, events } = data;
   const openEvents = events.filter(e => e.status === 'open');
   const mallName = mallDisplayName(mall?.city);
   const storeName = (storeId) => mallStores.find(s => s.store_id === storeId)?.store_name;
@@ -43,10 +42,10 @@ export default function Overview({ mallId, manager }) {
     <div>
       <PageHeader title={`Welcome, ${manager?.first_name || 'Manager'}`} subtitle={`${mallName} · ${mall?.city}, ${mall?.state}`} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={Store} label="Total Stores" value={mallStores.length} color="brand" />
-        <StatCard icon={Users} label="Employees" value={mallEmps.length} color="success" />
+        <StatCard icon={Store} label="Total Stores" value={counts.stores} color="brand" />
+        <StatCard icon={Users} label="Employees" value={counts.employees} color="success" />
         <StatCard icon={Gavel} label="Active Bids" value={openEvents.length} color="warning" />
-        <StatCard icon={Building2} label="Tenants" value={mallTenants.length} color="accent" />
+        <StatCard icon={Building2} label="Tenants" value={counts.tenants} color="accent" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

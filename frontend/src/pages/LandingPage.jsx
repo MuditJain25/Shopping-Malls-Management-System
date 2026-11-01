@@ -17,6 +17,7 @@ import {
   apiGetTopSellingProducts,
   apiGetAvailableStores,
   apiGetBidEvents,
+  apiGetMallOffers,
 } from "@/lib/api.js";
 import { ErrorState, EmptyState, LoadingSpinner } from "@/components/ui/index.jsx";
 import BidPage from "./LandingPageComponents/BidPage.jsx";
@@ -48,6 +49,7 @@ export default function LandingPage() {
   const [mallStores, setMallStores] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
   const [availableCount, setAvailableCount] = useState(0);
+  const [mallOffers, setMallOffers] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
 
@@ -117,14 +119,16 @@ export default function LandingPage() {
       try {
         setDetailLoading(true);
         setDetailError("");
-        const [stores, products, available] = await Promise.all([
+        const [stores, products, available, offers] = await Promise.all([
           apiGetStoresByMall(selectedMallId),
           apiGetTopSellingProducts(selectedMallId),
           apiGetAvailableStores(selectedMallId),
+          apiGetMallOffers(selectedMallId).catch(() => []),
         ]);
         if (cancelled) return;
         setMallStores(stores.filter((s) => s.status === "occupied"));
         setTopProducts(products);
+        setMallOffers(offers);
         setAvailableCount(available.length);
       } catch (err) {
         if (!cancelled) setDetailError(err.message || "Failed to load mall");
@@ -459,6 +463,7 @@ export default function LandingPage() {
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
               categoryProducts={categoryProducts}
+              offers={mallOffers}
               onBack={() => {
                 setView("home");
                 setSelectedMall(null);

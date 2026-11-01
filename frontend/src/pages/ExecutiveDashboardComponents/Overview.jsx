@@ -12,7 +12,7 @@ import {
 import {
   apiGetMalls,
   apiGetManagers,
-  apiGetTenants,
+  apiGetCounts,
   apiGetBidEvents,
   apiGetStores,
 } from "@/lib/api";
@@ -23,7 +23,7 @@ export default function Overview() {
   const [overview, setOverview] = useState({
     malls: [],
     managers: [],
-    tenants: [],
+    tenantCount: 0,
     bidEvents: [],
     stores: [],
   });
@@ -39,11 +39,11 @@ export default function Overview() {
       setError("");
 
       try {
-        const [malls, managers, tenants, bidEvents, stores] = await Promise.all(
+        const [malls, managers, counts, bidEvents, stores] = await Promise.all(
           [
             apiGetMalls(),
             apiGetManagers(),
-            apiGetTenants(),
+            apiGetCounts({ include: ["tenants"] }),
             apiGetBidEvents(),
             apiGetStores(),
           ],
@@ -54,7 +54,7 @@ export default function Overview() {
         setOverview({
           malls: Array.isArray(malls) ? malls : [],
           managers: Array.isArray(managers) ? managers : [],
-          tenants: Array.isArray(tenants) ? tenants : [],
+          tenantCount: counts?.tenants ?? 0,
           bidEvents: Array.isArray(bidEvents) ? bidEvents : [],
           stores: Array.isArray(stores) ? stores : [],
         });
@@ -95,7 +95,7 @@ export default function Overview() {
     );
   }
 
-  const { malls, managers, tenants, bidEvents, stores } = overview;
+  const { malls, managers, tenantCount, bidEvents, stores } = overview;
 
   const openEvents = bidEvents.filter(
     (event) => String(event.status).toLowerCase() === "open",
@@ -172,7 +172,7 @@ export default function Overview() {
         <StatCard
           icon={Store}
           label="Tenants"
-          value={tenants.length}
+          value={tenantCount}
           color="accent"
         />
 

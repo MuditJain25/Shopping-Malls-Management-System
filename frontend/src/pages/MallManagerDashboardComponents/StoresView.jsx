@@ -102,7 +102,7 @@ export default function StoresView({ mallId }) {
       />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {stores.map(store => {
-          const tenant = tenants.find(t => t.store_ids.includes(store.store_id));
+          const storeTenants = tenants.filter(t => t.store_ids.includes(store.store_id));
           const empCount = employees.filter(e => e.store_id === store.store_id).length;
           return (
             <div key={store.store_id} className="card overflow-hidden">
@@ -117,10 +117,10 @@ export default function StoresView({ mallId }) {
                 </div>
                 <p className="text-xs text-slate-400 mb-3">Shop {store.shop_number} · Floor {store.floor} · {store.area_sqft} sqft</p>
                 <div className="space-y-1 text-sm">
-                  {tenant && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Tenant</span>
-                      <span className="font-medium text-slate-700">{tenant.business_name}</span>
+                  {storeTenants.length > 0 && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-slate-500">{storeTenants.length > 1 ? 'Tenants' : 'Tenant'}</span>
+                      <span className="font-medium text-slate-700 text-right">{storeTenants.map(t => t.business_name).join(', ')}</span>
                     </div>
                   )}
                   <div className="flex justify-between">

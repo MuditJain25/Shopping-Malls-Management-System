@@ -821,37 +821,3 @@ export async function apiCheckOut(empId) {
     method: "POST",
   });
 }
-
-// ── Analytics ─────────────────────────────────────────────────
-export async function apiGetMallAnalytics(mallId) {
-  // return apiFetch(`/analytics/mall/${mallId}`);
-  // MOCK: compute from mock data
-  const mallStores = mock.getStoresByMall(mallId);
-  const occupiedStores = mallStores.filter((s) => s.status === "occupied");
-  const mall = mock.malls.find((m) => m.mall_id === mallId);
-  const mallName = mall
-    ? mall.city === "New York"
-      ? "Heritage Plaza Mall"
-      : mall.city === "San Jose"
-        ? "Tech Park Mall"
-        : "Lakeshore Mall"
-    : "";
-  const mallTransactions = mock.transactions.filter(
-    (t) => t.receiver === mallName,
-  );
-  const totalRevenue = mallTransactions.reduce((sum, t) => sum + t.amount, 0);
-  const mallTenants = mock.tenants.filter((t) =>
-    t.store_ids.some((sid) => mallStores.some((s) => s.store_id === sid)),
-  );
-  return {
-    totalRevenue,
-    customerCount:
-      12500 + (mallId === "m1" ? 3200 : mallId === "m2" ? 2100 : 1800),
-    avgRevenuePerStore: occupiedStores.length
-      ? Math.round(totalRevenue / occupiedStores.length)
-      : 0,
-    partnerCount: mallTenants.length,
-    storeCount: mallStores.length,
-    occupiedCount: occupiedStores.length,
-  };
-}
