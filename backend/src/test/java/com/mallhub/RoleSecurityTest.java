@@ -9,6 +9,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.hasItem;
@@ -250,12 +252,146 @@ class RoleSecurityTest {
                 .andExpect(status().isCreated());
     }
 
+    private ResultActions send(MockHttpServletRequestBuilder req, String role, int id, String body)
+            throws Exception {
+        return mvc.perform(req.header("Authorization", auth(role, id))
+                .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    // ── mall-only employees ────────────────────────────────────────
     @Test
-    void managerCannotReadAnotherMallsTransactions() throws Exception {
-        mvc.perform(get("/api/transactions")
-                        .param("mallId", "2")
-                        .header("Authorization", auth("mall_manager", 1)))
+    void managerAndExecutiveCanCreateMallOnlyEmployee() throws Exception {
+        for (String[] who : new String[][]{{"mall_manager", "1"}, {"executive", "1"}}) {
+            send(post("/api/employees"), who[0], Integer.parseInt(who[1]),
+                    "{\"first_name\":\"Mall\",\"last_name\":\"Staff\",\"mall_id\":1}")
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.store_id").doesNotExist())
+                    .andExpect(jsonPath("$.mall_id").value(1));
+        }
+    }
+
+    @Test
+    void tenantAndShopManagerCannotCreateMallOnlyEmployee() throws Exception {
+        String body = "{\"first_name\":\"Mall\",\"last_name\":\"Staff\",\"mall_id\":1}";
+        send(post("/api/employees"), "tenant", 1, body).andExpect(status().isForbidden());
+        send(post("/api/employees"), "shop_manager", 1, body).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void managerCannotCreateMallOnlyEmployeeInAnotherMall() throws Exception {
+        send(post("/api/employees"), "mall_manager", 1,
+                "{\"first_name\":\"Mall\",\"last_name\":\"Staff\",\"mall_id\":2}")
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createEmployeeWithoutStoreOrMallIsBadRequest() throws Exception {
+        send(post("/api/employees"), "mall_manager", 1,
+                "{\"first_name\":\"No\",\"last_name\":\"Place\"}")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void storeWinsOverMallWhenBothGiven() throws Exception {
+        send(post("/api/employees"), "executive", 1,
+                "{\"first_name\":\"Both\",\"last_name\":\"Ids\",\"store_id\":9,\"mall_id\":2}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.store_id").value(9))
+                .andExpect(jsonPath("$.mall_id").value(3));
+    }
+
+    @Test
+    void managerCanMoveEmployeeToMallStaffButTenantCannot() throws Exception {
+        String body = "{\"first_name\":\"Sarah\",\"last_name\":\"Johnson\",\"mall_id\":1}";
+        send(put("/api/employees/2"), "tenant", 1, body).andExpect(status().isForbidden());
+        send(put("/api/employees/2"), "shop_manager", 1, body).andExpect(status().isForbidden());
+        send(put("/api/employees/2"), "mall_manager", 1, body)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.store_id").doesNotExist());
+        send(put("/api/employees/2"), "mall_manager", 2, body).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void executiveCanDeleteEmployee() throws Exception {
+        mvc.perform(delete("/api/employees/7").header("Authorization", auth("executive", 1)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void tenantEmployeeCreateStillNeedsOwnedStore() throws Exception {
+        send(post("/api/tenants/1/employees"), "tenant", 1,
+                "{\"first_name\":\"No\",\"last_name\":\"Store\",\"mall_id\":1}")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void mallOnlyShopManagerCannotReadOtherStorelessEmployees() throws Exception {
+        MvcResult created = send(post("/api/employees"), "executive", 1,
+                "{\"first_name\":\"Floating\",\"last_name\":\"Boss\",\"current_designation\":\"Shop Manager\",\"mall_id\":3}")
+                .andExpect(status().isCreated()).andReturn();
+        int id = JsonPath.read(created.getResponse().getContentAsString(), "$.employee_id");
+        mvc.perform(get("/api/employees/7").header("Authorization", auth("shop_manager", id)))
+                .andExpect(status().isForbidden());
+    }
+
+    // ── transactions ───────────────────────────────────────────────
+    @Test
+    void anyOperatingRoleCanCreateTransactionWithOnlyAmount() throws Exception {
+        for (String role : new String[]{"tenant", "shop_manager", "mall_manager", "executive"}) {
+            send(post("/api/transactions"), role, 1, "{\"amount\":100}")
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.transaction_date").exists());
+        }
+    }
+
+    @Test
+    void customerCannotCreateTransaction() throws Exception {
+        send(post("/api/transactions"), "customer", 1, "{\"amount\":100}")
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void transactionWithoutAmountIsRejected() throws Exception {
+        send(post("/api/transactions"), "executive", 1, "{\"sender\":\"AC-1\"}")
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void onlyManagerAndExecutiveCanUpdateTransaction() throws Exception {
+        String body = "{\"amount\":250,\"sender\":\"AC-1\",\"receiver\":\"AC-2\"}";
+        send(put("/api/transactions/1"), "tenant", 1, body).andExpect(status().isForbidden());
+        send(put("/api/transactions/1"), "shop_manager", 1, body).andExpect(status().isForbidden());
+        send(put("/api/transactions/1"), "mall_manager", 1, body)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sender").value("AC-1"))
+                .andExpect(jsonPath("$.transaction_date").value("2026-08-01"));
+        send(put("/api/transactions/1"), "executive", 1, body).andExpect(status().isOk());
+        send(put("/api/transactions/99999"), "executive", 1, body).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void operatingRolesCanListTransactionsButCustomerCannot() throws Exception {
+        for (String role : new String[]{"tenant", "shop_manager", "mall_manager", "executive"}) {
+            mvc.perform(get("/api/transactions").header("Authorization", auth(role, 1)))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/transactions").header("Authorization", auth("customer", 1)))
+                .andExpect(status().isForbidden());
+    }
+
+    // ── revenue ────────────────────────────────────────────────────
+    @Test
+    void tenantCanUpdateOwnRevenueOnly() throws Exception {
+        MvcResult created = send(post("/api/tenants/1/revenue"), "tenant", 1,
+                "{\"description\":\"v1\"}").andExpect(status().isCreated()).andReturn();
+        int infoId = JsonPath.read(created.getResponse().getContentAsString(), "$.information_id");
+        String path = "/api/tenants/1/revenue/" + infoId;
+        send(put(path), "tenant", 1, "{\"description\":\"v2\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("v2"));
+        send(put(path), "tenant", 2, "{\"description\":\"hijack\"}").andExpect(status().isForbidden());
+        send(put("/api/tenants/1/revenue/99999"), "tenant", 1, "{\"description\":\"x\"}")
+                .andExpect(status().isNotFound());
     }
 
     @Test

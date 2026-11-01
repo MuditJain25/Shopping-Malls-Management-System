@@ -123,7 +123,7 @@ Each is an interface extending `JpaRepository<Entity, KeyType>`; method names be
 | `EmployeeService` | Leave: `end ≥ start`, only `pending` decidable, decision is `approved`/`rejected`; attendance: check-in creates today's row, second check-in → 409, check-out needs a check-in, second check-out → 409 |
 | `ManagerService` | `create` requires the mall to exist and the email to be unused in **all** role tables (email is the login key — it must resolve to exactly one role) |
 | `ExecutiveService` | Read-only (no executive creation endpoint — seeded only) |
-| `TransactionService` | `receiverFor` maps mall city → receiver string in ONE place (`New York → Heritage Plaza Mall…`); marked TODO for FK normalization |
+| `TransactionService` | Plain ledger: list / create (date defaults to today) / update. `sender`/`receiver` are raw account values, so rows have no mall link and there is no `?mallId=` filter |
 | *(no `ProductService`)* | Catalog CRUD sits in `ProductController` straight against `ProductRepository` — only store-scoped rules need a service. `GET /api/products?search=` matches name OR category, and is the one list endpoint with no `?page=` (the picker wants the whole catalog) |
 
 ---
@@ -186,7 +186,8 @@ Second call: row exists with check-in set → 409 "Already checked in today"
    code matches the migrated schema.
 8. *Why does finalize accept text it doesn't store?* `final_allocation` is still `BOOLEAN`
    per the frozen schema; persisting the note awaits the `VARCHAR` migration (pending P3).
-9. *Revenue endpoints?* Deferred entirely (entity exists, no controller) — pending P2.
+9. *Revenue endpoints?* `GET`/`POST`/`PUT /api/tenants/{id}/revenue` exist, `description` only.
+   The `month`/`amount`/`submitted_date` columns are still deferred — pending P2.
 10. *N+1 queries (e.g. `topProducts` loops repos)?* Fine for tens of rows; would replace with
     a JPQL fetch-join at scale.
 11. *What breaks if someone inserts rows by hand?* Weak-entity ids use per-parent `MAX+1`;
@@ -201,6 +202,6 @@ Second call: row exists with check-in set → 409 "Already checked in today"
 Mall = shopping centre · Store = shop unit (`occupied`/`available`) · Tenant = business renting
 stores · listing_media = the store's display image · to_show = "Top Selling" star ·
 BidEvent = auction for an available store · winning/outbid = bid states · Revenue_Information =
-tenant's self-reported revenue (deferred) · Financial_Transaction = rent payments ·
+tenant's self-reported revenue (description only) · Financial_Transaction = rent payments ·
 Leave_Request / Payroll_Record / Attendance = employee self-service · oversees = which malls
 an executive supervises.

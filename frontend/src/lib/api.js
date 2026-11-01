@@ -78,6 +78,7 @@
 //   GET    /api/tenants/{id}/transactions → FinancialTransaction[]
 //   GET    /api/tenants/{id}/revenue → Revenue[]
 //   POST   /api/tenants/{id}/revenue → Revenue 201
+//   PUT    /api/tenants/{id}/revenue/{infoId} → Revenue
 //
 // ── Employees ───────────────────────────────────────────────────
 //   POST   /api/employees → Employee 201
@@ -101,7 +102,9 @@
 //   DELETE /api/managers/{id} → 204
 //   GET    /api/executives/{id} → EnterpriseExecutive
 //   GET    /api/executives/{id}/malls → Mall[]
-//   GET    /api/transactions?mallId= → FinancialTransaction[]
+//   GET    /api/transactions → FinancialTransaction[]
+//   POST   /api/transactions → FinancialTransaction 201
+//   PUT    /api/transactions/{id} → FinancialTransaction
 // ═══════════════════════════════════════════════════════════════
 
 import * as mock from "./mockData.js";
@@ -615,7 +618,6 @@ export async function apiGetEmployeesByStore(storeId) {
 }
 
 // Creates an employee assigned to a store.
-// Store-less employee creation is not supported by the backend yet.
 export async function apiAddStoreEmployee(tenantId, employeeData) {
   return apiFetch(`/tenants/${tenantId}/employees`, {
     method: "POST",
@@ -623,7 +625,7 @@ export async function apiAddStoreEmployee(tenantId, employeeData) {
   });
 }
 
-// Backend does not yet support creating store-less employees.
+// Send store_id for store staff, or mall_id alone for mall-only staff.
 export async function apiAddEmployee(employeeData) {
   return apiFetch("/employees", {
     method: "POST",
@@ -662,6 +664,13 @@ export async function apiGetTransactionsByMall(mallId) {
   const qs = mallId ? `?mallId=${encodeURIComponent(mallId)}` : "";
   const data = await apiFetch(`/transactions${qs}`);
   return unwrap(data);
+}
+
+export async function apiCreateTransaction(transactionData) {
+  return apiFetch("/transactions", {
+    method: "POST",
+    body: JSON.stringify(transactionData),
+  });
 }
 
 // ── Mall Employees ─────────────────────────────────────────────

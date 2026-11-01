@@ -8,7 +8,7 @@ import lombok.Setter;
 import java.io.Serializable;
 import java.util.Objects;
 
-// Endpoints deferred (pending P2) — entity kept so the table stays managed.
+// Description only; month/amount/submitted_date columns are still deferred (pending P2).
 @Entity
 @Table(name = "Revenue_Information")
 @Getter

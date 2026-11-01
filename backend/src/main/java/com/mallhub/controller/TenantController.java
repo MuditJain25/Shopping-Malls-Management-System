@@ -122,4 +122,11 @@ public class TenantController {
                                 @Valid @RequestBody PeopleDtos.RevenueCreateRequest req) {
         return tenants.submitRevenue(id, req);
     }
+
+    @PutMapping("/{id}/revenue/{infoId}")
+    @PreAuthorize("hasRole('TENANT') and @access.canAccessTenant(#id)")
+    public Object updateRevenue(@PathVariable Integer id, @PathVariable Integer infoId,
+                                @Valid @RequestBody PeopleDtos.RevenueCreateRequest req) {
+        return tenants.updateRevenue(id, infoId, req);
+    }
 }

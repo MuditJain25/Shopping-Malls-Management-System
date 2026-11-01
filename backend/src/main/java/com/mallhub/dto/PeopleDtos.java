@@ -3,6 +3,7 @@ package com.mallhub.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,7 +36,7 @@ public final class PeopleDtos {
     public record EmployeeCreateRequest(@NotBlank String firstName, @NotBlank String lastName,
                                         @Email String email, String phoneNumber,
                                         String currentDesignation, BigDecimal baseSalary,
-                                        @NotNull Integer storeId) {
+                                        Integer storeId, Integer mallId) {
     }
 
     public record ManagerResponse(Integer managerId, String firstName, String lastName,
@@ -75,6 +76,11 @@ public final class PeopleDtos {
     public record TransactionResponse(Integer transactionId, BigDecimal amount, String sender,
                                       String receiver, String senderType, String receiverType,
                                       LocalDate transactionDate, String remarks) {
+    }
+
+    public record TransactionRequest(@NotNull @Positive BigDecimal amount, String sender,
+                                     String receiver, String senderType, String receiverType,
+                                     LocalDate transactionDate, String remarks) {
     }
 
     public record StoreLeaveResponse(Integer employeeId, String firstName, String lastName,

@@ -17,7 +17,7 @@
 | D-MALL-COLS | Add `Mall.image_url`, `Mall.description` (required — present in mock, absent in schema). |
 | D-LISTING | `Store.listing_media` is ONE single image URL string (no array, no new table). See §6-D2. v2.1 revision: single-URL per user answer. |
 | D-TOSHOW | `Store_Sells_Product.to_show` is `BOOLEAN`. |
-| D-REVENUE | `Revenue_Information` UNCHANGED + revenue endpoints DEFERRED entirely (pending, not even accept-but-ignore). See §16-P2. |
+| D-REVENUE | `Revenue_Information` UNCHANGED. GET/POST/PUT revenue endpoints exist (`description` only); `month/amount/submitted_date` deferred. See §16-P2. |
 | D-TXN | `Financial_Transaction.sender/receiver` stay `VARCHAR` (no FK). But `sender_type/receiver_type` must be added (missing in schema, present in mock). |
 | D-EMP-MALL | `Employee.mall_id` added, `NOT NULL`, `ON DELETE RESTRICT` (confirmed). |
 | D-MGR-MALL | `Mall_Manager.mall_id` is `NOT NULL` (manager must belong to a mall), `ON DELETE RESTRICT` (confirmed). |
@@ -378,12 +378,17 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | DELETE | `/tenants/{id}/stores/{storeId}` | — | `204` | mall_manager,exec | **added**; deletes the join row, `404` if not linked |
 | GET | `/tenants/{id}/employees` | — | `Employee[]` | tenant,mall_manager | aggregate over tenant stores |
 | POST | `/tenants/{id}/employees` | EmployeeCreate | `Employee 201` | tenant | store must belong to tenant |
-| GET | `/tenants/{id}/revenue` | — | `Revenue[]` | tenant,exec | DEFERRED v2.1 — not in MVP build (pending P2) |
-| POST | `/tenants/{id}/revenue` | `{description,month,amount}` | `Revenue 201` | tenant | DEFERRED v2.1 — not in MVP build (pending P2) |
+| GET | `/tenants/{id}/revenue` | — | `Revenue[]` | tenant,exec | `description` only; `month/amount/submitted_date` still deferred (pending P2) |
+| POST | `/tenants/{id}/revenue` | `{description}` | `Revenue 201` | tenant | as above |
+| PUT | `/tenants/{id}/revenue/{infoId}` | `{description}` | `Revenue` | tenant | as above; 404 if missing |
 | GET | `/tenants/{id}/transactions` | — | `Txn[]` | tenant | `sender = tenant.business_name` |
+| GET | `/transactions` | — | `Txn[]` | tenant,shop_manager,mall_manager,exec | all rows (no per-row owner); `?mallId=` removed — sender/receiver are account values, not mall ids |
+| POST | `/transactions` | `{amount,sender,receiver,sender_type,receiver_type,transaction_date,remarks}` | `Txn 201` | tenant,shop_manager,mall_manager,exec | only `amount` required; date defaults to today |
+| PUT | `/transactions/{id}` | as POST | `Txn` | mall_manager,exec | full replace; null date keeps existing |
+| POST | `/employees` | EmployeeCreate | `Employee 201` | tenant,shop_manager,mall_manager,exec | `store_id` optional: `store_id` → store staff (mall derived); `mall_id` alone → mall-only staff; neither → 400 |
 | GET | `/employees/{id}` | — | `Employee` | self,manager,tenant | |
-| PUT | `/employees/{id}` | EmployeeCreate | `Employee` | tenant,shop_manager,mall_manager,exec | **added**; may move store (and follows its mall) |
-| DELETE | `/employees/{id}` | — | `204` | tenant,mall_manager | **added** (`EmployeesView.jsx:34`) |
+| PUT | `/employees/{id}` | EmployeeCreate | `Employee` | tenant,shop_manager,mall_manager,exec | **added**; may move store (and follows its mall); omitting `store_id` with `mall_id` makes mall-only staff |
+| DELETE | `/employees/{id}` | — | `204` | tenant,mall_manager,exec | **added** (`EmployeesView.jsx:34`) |
 | GET | `/employees/{id}/leave-requests` | — | `Leave[]` | self,manager | |
 | POST | `/employees/{id}/leave-requests` | `{start_date,end_date,reason}` | `Leave 201 pending` | self | validates end≥start |
 | PATCH | `/employees/{id}/leave-requests/{rid}` | `{status}` | `Leave` | tenant,mall_manager | **added** (approval; no api.js entry) |
@@ -464,7 +469,7 @@ Demo placeholder logins (work in BOTH modes; in `demo` mode no Google token need
 - **Dates:** `YYYY-MM-DD`, datetimes ISO-8601, times `HH:mm` — matches current parsing, no change.
 - **Auth switch:** frontend `AuthContext` + `AuthPage` must be replaced with Google Identity Services button + `POST /api/auth/google`; `getAuthHeaders()` Bearer uses app JWT. Role strings stay lowercase (`shop_manager` inferred).
 - **Pagination:** frozen frontend calls without `?page=` get plain arrays — no break. New callers may opt into envelopes.
-- **Revenue:** endpoints + UI both deferred together (pending P2). No `amount/month` in MVP.
+- **Revenue:** endpoints exist (`description` only); the UI still has an amount field. No `amount/month` persisted until P2.
 
 ---
 
@@ -490,7 +495,7 @@ Demo placeholder logins (work in BOTH modes; in `demo` mode no Google token need
 | ID | Item | Trigger to implement |
 |---|---|---|
 | P1 | Analytics endpoint + service | New requirement + `Financial_Transaction.receiver_mall_id` normalization decision |
-| P2 | Revenue endpoints + `Revenue_Information ADD (month, amount, submitted_date)` + seed | Deferred per v2.1 answer — not in MVP |
+| P2 | `Revenue_Information ADD (month, amount, submitted_date)` + seed | Endpoints shipped with `description` only; these columns still deferred |
 | P3 | `Bid_Event.final_allocation BOOLEAN → VARCHAR(500)` (+ keep `status`) | User approval; blocks legal allocation notes |
 | P4 | `Bid ADD UNIQUE(bid_id)` → eventual surrogate PK | After P3, low priority |
 | P5 | `Financial_Transaction.receiver_mall_id FK` normalization | If analytics revived |

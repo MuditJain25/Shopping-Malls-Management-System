@@ -7,6 +7,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TransactionRepository extends JpaRepository<FinancialTransaction, Integer> {
     Page<FinancialTransaction> findBySender(String sender, Pageable pageable);
-
-    Page<FinancialTransaction> findByReceiver(String receiver, Pageable pageable);
 }

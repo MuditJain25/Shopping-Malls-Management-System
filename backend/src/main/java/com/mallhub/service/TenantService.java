@@ -133,6 +133,15 @@ public class TenantService {
         return toRevenue(row);
     }
 
+    @Transactional
+    public PeopleDtos.RevenueResponse updateRevenue(Integer tenantId, Integer infoId,
+                                                    PeopleDtos.RevenueCreateRequest req) {
+        var row = revenue.findById(new RevenueInformation.Id(tenantId, infoId))
+                .orElseThrow(() -> ApiException.notFound("Revenue information"));
+        row.setDescription(req.description());
+        return toRevenue(row);
+    }
+
     public Page<PeopleDtos.TransactionResponse> transactionsByTenant(Integer tenantId, Pageable pageable) {
         var t = require(tenantId);
         return transactions.findBySender(t.getBusinessName(), pageable).map(TenantService::toResponse);

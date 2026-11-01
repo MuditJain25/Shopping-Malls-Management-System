@@ -87,6 +87,15 @@ public class Access {
         return false;
     }
 
+    // Employees may be store staff (store wins) or mall-only staff (store_id null).
+    // Neither id passes so the service answers 400 rather than 403.
+    public boolean canAccessStoreOrMall(Integer storeId, Integer mallId) {
+        if (!enabled) return true;
+        if (storeId != null) return canAccessStore(storeId);
+        if (mallId != null) return canAccessMall(mallId);
+        return true;
+    }
+
     // A store edit may pick a mall: managers stay in their mall, tenants cannot move
     // an existing store out of its mall.
     public boolean canWriteStore(Integer storeId, Integer mallId) {
@@ -125,8 +134,10 @@ public class Access {
         if (target == null) return false;
         if (isEmployee(p)) return Objects.equals(p.profileId(), employeeId);
         if (isShopManager(p)) {
+            // storeOf may be null for a mall-only "Shop Manager"; null must not match store-less staff.
+            Integer store = storeOf(p);
             return Objects.equals(p.profileId(), employeeId)
-                    || Objects.equals(storeOf(p), target.getStoreId());
+                    || (store != null && Objects.equals(store, target.getStoreId()));
         }
         if (isTenant(p)) {
             return target.getStoreId() != null

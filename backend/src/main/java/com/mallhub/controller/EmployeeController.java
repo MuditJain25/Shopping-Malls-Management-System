@@ -22,7 +22,7 @@ public class EmployeeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','SHOP_MANAGER') and @access.canAccessStore(#req.storeId())")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','SHOP_MANAGER','EXECUTIVE') and @access.canAccessStoreOrMall(#req.storeId(), #req.mallId())")
     public Object create(@Valid @RequestBody PeopleDtos.EmployeeCreateRequest req) {
         return employees.create(req);
     }
@@ -34,7 +34,7 @@ public class EmployeeController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER','EXECUTIVE') and @access.canAccessEmployee(#id) and @access.canAccessStore(#req.storeId())")
+    @PreAuthorize("hasAnyRole('TENANT','SHOP_MANAGER','MALL_MANAGER','EXECUTIVE') and @access.canAccessEmployee(#id) and @access.canAccessStoreOrMall(#req.storeId(), #req.mallId())")
     public Object update(@PathVariable Integer id,
                          @Valid @RequestBody PeopleDtos.EmployeeCreateRequest req) {
         return employees.update(id, req);
@@ -42,7 +42,7 @@ public class EmployeeController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','SHOP_MANAGER') and @access.canAccessEmployee(#id)")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','SHOP_MANAGER','EXECUTIVE') and @access.canAccessEmployee(#id)")
     public void delete(@PathVariable Integer id) {
         employees.delete(id);
     }

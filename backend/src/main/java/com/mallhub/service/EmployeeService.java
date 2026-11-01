@@ -19,15 +19,17 @@ import java.util.List;
 public class EmployeeService {
     private final EmployeeRepository employees;
     private final StoreRepository stores;
+    private final MallRepository malls;
     private final LeaveRequestRepository leaves;
     private final PayrollRecordRepository payroll;
     private final AttendanceRepository attendance;
 
     public EmployeeService(EmployeeRepository employees, StoreRepository stores,
-                           LeaveRequestRepository leaves, PayrollRecordRepository payroll,
-                           AttendanceRepository attendance) {
+                           MallRepository malls, LeaveRequestRepository leaves,
+                           PayrollRecordRepository payroll, AttendanceRepository attendance) {
         this.employees = employees;
         this.stores = stores;
+        this.malls = malls;
         this.leaves = leaves;
         this.payroll = payroll;
         this.attendance = attendance;
@@ -49,7 +51,6 @@ public class EmployeeService {
                 && employees.findByEmail(req.email()).isPresent()) {
             throw ApiException.conflict("Email is already registered");
         }
-        var store = stores.findById(req.storeId()).orElseThrow(() -> ApiException.notFound("Store"));
         var e = new Employee();
         e.setFirstName(req.firstName());
         e.setLastName(req.lastName());
@@ -57,8 +58,7 @@ public class EmployeeService {
         e.setPhoneNumber(req.phoneNumber());
         e.setCurrentDesignation(req.currentDesignation());
         e.setBaseSalary(req.baseSalary());
-        e.setStoreId(store.getStoreId());
-        e.setMallId(store.getMallId());
+        placeEmployee(e, req);
         e.setDateOfJoining(LocalDate.now());
         return toResponse(employees.save(e));
     }
@@ -71,16 +71,29 @@ public class EmployeeService {
                 && employees.findByEmail(req.email()).isPresent()) {
             throw ApiException.conflict("Email is already registered");
         }
-        var store = stores.findById(req.storeId()).orElseThrow(() -> ApiException.notFound("Store"));
         e.setFirstName(req.firstName());
         e.setLastName(req.lastName());
         e.setEmail(req.email());
         e.setPhoneNumber(req.phoneNumber());
         e.setCurrentDesignation(req.currentDesignation());
         e.setBaseSalary(req.baseSalary());
-        e.setStoreId(store.getStoreId());
-        e.setMallId(store.getMallId());
+        placeEmployee(e, req);
         return toResponse(e);
+    }
+
+    // store_id wins and the mall follows it; otherwise mall_id makes a mall-only employee.
+    private void placeEmployee(Employee e, PeopleDtos.EmployeeCreateRequest req) {
+        if (req.storeId() != null) {
+            var store = stores.findById(req.storeId()).orElseThrow(() -> ApiException.notFound("Store"));
+            e.setStoreId(store.getStoreId());
+            e.setMallId(store.getMallId());
+        } else if (req.mallId() != null) {
+            if (!malls.existsById(req.mallId())) throw ApiException.notFound("Mall");
+            e.setStoreId(null);
+            e.setMallId(req.mallId());
+        } else {
+            throw ApiException.badRequest("store_id or mall_id is required");
+        }
     }
 
     @Transactional

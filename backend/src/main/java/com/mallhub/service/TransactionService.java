@@ -1,41 +1,53 @@
 package com.mallhub.service;
 
 import com.mallhub.dto.PeopleDtos;
-import com.mallhub.entity.Mall;
+import com.mallhub.entity.FinancialTransaction;
 import com.mallhub.exception.ApiException;
-import com.mallhub.repository.MallRepository;
 import com.mallhub.repository.TransactionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
+// A plain ledger: sender/receiver are raw account values, so rows carry no mall link.
 @Service
 public class TransactionService {
     private final TransactionRepository transactions;
-    private final MallRepository malls;
 
-    public TransactionService(TransactionRepository transactions, MallRepository malls) {
+    public TransactionService(TransactionRepository transactions) {
         this.transactions = transactions;
-        this.malls = malls;
     }
 
-    public Page<PeopleDtos.TransactionResponse> list(Integer mallId, Pageable pageable) {
-        if (mallId == null) {
-            return transactions.findAll(pageable).map(TenantService::toResponse);
-        }
-        Mall mall = malls.findById(mallId).orElseThrow(() -> ApiException.notFound("Mall"));
-        // Receiver names are denormalized strings; the mapping lives in one place.
-        // TODO: normalize to receiver_mall_id FK if analytics is revived (pending P5).
-        return transactions.findByReceiver(receiverFor(mall), pageable).map(TenantService::toResponse);
+    public Page<PeopleDtos.TransactionResponse> list(Pageable pageable) {
+        return transactions.findAll(pageable).map(TenantService::toResponse);
     }
 
-    static String receiverFor(Mall mall) {
-        if (mall.getCity() == null) return "";
-        return switch (mall.getCity()) {
-            case "New York" -> "Heritage Plaza Mall";
-            case "San Jose" -> "Tech Park Mall";
-            case "Chicago" -> "Lakeshore Mall";
-            default -> mall.getCity() + " Mall";
-        };
+    @Transactional
+    public PeopleDtos.TransactionResponse create(PeopleDtos.TransactionRequest req) {
+        var tx = new FinancialTransaction();
+        apply(tx, req);
+        if (tx.getTransactionDate() == null) tx.setTransactionDate(LocalDate.now());
+        return TenantService.toResponse(transactions.save(tx));
+    }
+
+    @Transactional
+    public PeopleDtos.TransactionResponse update(Integer id, PeopleDtos.TransactionRequest req) {
+        var tx = transactions.findById(id).orElseThrow(() -> ApiException.notFound("Transaction"));
+        LocalDate keep = tx.getTransactionDate();
+        apply(tx, req);
+        if (tx.getTransactionDate() == null) tx.setTransactionDate(keep);
+        return TenantService.toResponse(tx);
+    }
+
+    private static void apply(FinancialTransaction tx, PeopleDtos.TransactionRequest req) {
+        tx.setAmount(req.amount());
+        tx.setSender(req.sender());
+        tx.setReceiver(req.receiver());
+        tx.setSenderType(req.senderType());
+        tx.setReceiverType(req.receiverType());
+        tx.setTransactionDate(req.transactionDate());
+        tx.setRemarks(req.remarks());
     }
 }
