@@ -11,10 +11,6 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
   const [editingStore, setEditingStore] = useState(null);
   const [editForm, setEditForm] = useState({
     store_name: "",
-    shop_number: "",
-    floor: "",
-    area_sqft: "",
-    status: "",
     listing_media: "",
   });
   const [savingStore, setSavingStore] = useState(false);
@@ -33,10 +29,6 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
     setEditingStore(store);
     setEditForm({
       store_name: store.store_name ?? "",
-      shop_number: store.shop_number ?? "",
-      floor: store.floor ?? "",
-      area_sqft: store.area_sqft ?? "",
-      status: store.status ?? "",
       listing_media: listingMedia,
     });
     setEditError("");
@@ -46,35 +38,19 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
     if (!editingStore) return;
 
     const storeName = editForm.store_name.trim();
-    const floorValue = editForm.floor;
-    const areaValue = editForm.area_sqft;
 
     if (!storeName) {
       setEditError("Store name is required.");
       return;
     }
 
-    if (floorValue === "" || !Number.isInteger(Number(floorValue))) {
-      setEditError("Enter a valid floor number.");
-      return;
-    }
-
-    if (
-      areaValue === "" ||
-      !Number.isFinite(Number(areaValue)) ||
-      Number(areaValue) < 0
-    ) {
-      setEditError("Enter a valid non-negative area.");
-      return;
-    }
-
     const updatedStoreData = {
       store_name: storeName,
       mall_id: editingStore.mall_id,
-      shop_number: editForm.shop_number.trim() || null,
-      floor: Number(floorValue),
-      area_sqft: Number(areaValue),
-      status: editForm.status.trim() || null,
+      shop_number: editingStore.shop_number ?? null,
+      floor: editingStore.floor,
+      area_sqft: editingStore.area_sqft,
+      status: editingStore.status ?? null,
       listing_media: editForm.listing_media.trim() || null,
     };
 
@@ -239,12 +215,9 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
             <div>
               <label className="label">Shop Number</label>
               <input
-                className="input"
-                value={editForm.shop_number}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, shop_number: e.target.value })
-                }
-                placeholder="e.g. A-12"
+                className="input bg-slate-50 cursor-not-allowed"
+                value={editingStore?.shop_number ?? ""}
+                readOnly
               />
             </div>
 
@@ -252,13 +225,9 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
               <label className="label">Floor</label>
               <input
                 type="number"
-                step="1"
-                className="input"
-                value={editForm.floor}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, floor: e.target.value })
-                }
-                placeholder="Floor number"
+                className="input bg-slate-50 cursor-not-allowed"
+                value={editingStore?.floor ?? ""}
+                readOnly
               />
             </div>
           </div>
@@ -267,26 +236,18 @@ export default function StoresView({ stores, role, onStoreUpdated }) {
             <label className="label">Area (sqft)</label>
             <input
               type="number"
-              min="0"
-              step="any"
-              className="input"
-              value={editForm.area_sqft}
-              onChange={(e) =>
-                setEditForm({ ...editForm, area_sqft: e.target.value })
-              }
-              placeholder="Enter area"
+              className="input bg-slate-50 cursor-not-allowed"
+              value={editingStore?.area_sqft ?? ""}
+              readOnly
             />
           </div>
 
           <div>
             <label className="label">Status</label>
             <input
-              className="input"
-              value={editForm.status}
-              onChange={(e) =>
-                setEditForm({ ...editForm, status: e.target.value })
-              }
-              placeholder="Current store status"
+              className="input bg-slate-50 cursor-not-allowed"
+              value={editingStore?.status ?? ""}
+              readOnly
             />
           </div>
 

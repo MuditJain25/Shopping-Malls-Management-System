@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
+
 import {
   PageHeader,
   DataTable,
@@ -7,12 +8,15 @@ import {
   LoadingSpinner,
   ErrorState,
 } from "@/components/ui/index.jsx";
+
 import Modal from "@/components/ui/Modal.jsx";
+
 import {
   apiGetTenants,
   apiGetMalls,
   apiGetStores,
   apiCreateTenant,
+  apiUpdateTenant,
   apiDeleteTenant,
 } from "@/lib/api.js";
 
@@ -33,6 +37,7 @@ export default function TenantsView() {
   const [refresh, setRefresh] = useState(0);
 
   const [showAdd, setShowAdd] = useState(false);
+  const [tenantToEdit, setTenantToEdit] = useState(null);
   const [tenantToRemove, setTenantToRemove] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -66,9 +71,14 @@ export default function TenantsView() {
     };
   }, [refresh]);
 
-  const mallById = (id) => malls.find((mall) => mall.mall_id === id);
+  const mallById = (id) =>
+    malls.find((mall) => String(mall.mall_id) === String(id));
 
-  const storeById = (id) => stores.find((store) => store.store_id === id);
+  const storeById = (id) =>
+    stores.find((store) => String(store.store_id) === String(id));
+
+  const getTenantStore = (tenant) =>
+    (tenant.store_ids || []).map(storeById).find(Boolean);
 
   const updateField = (field, value) => {
     setForm((current) => ({
@@ -77,7 +87,30 @@ export default function TenantsView() {
     }));
   };
 
-  const handleCreate = async (event) => {
+  const openAddModal = () => {
+    setTenantToEdit(null);
+    setForm({ ...EMPTY_FORM });
+    setActionError(null);
+    setShowAdd(true);
+  };
+
+  const openEditModal = (tenant) => {
+    const store = getTenantStore(tenant);
+
+    setTenantToEdit(tenant);
+    setForm({
+      business_name: tenant.business_name || "",
+      business_type: tenant.business_type || "",
+      email: tenant.email || "",
+      phone_number: tenant.phone_number || "",
+      mall_id: store ? String(store.mall_id) : "",
+      store_id: store ? String(store.store_id) : "",
+    });
+    setActionError(null);
+    setShowAdd(true);
+  };
+
+  const handleSave = async (event) => {
     event.preventDefault();
 
     if (saving) return;
@@ -85,17 +118,24 @@ export default function TenantsView() {
     setActionError(null);
     setSaving(true);
 
+    const tenantData = {
+      business_name: form.business_name.trim(),
+      business_type: form.business_type.trim(),
+      email: form.email.trim(),
+      phone_number: form.phone_number.trim(),
+      store_ids: form.store_id ? [Number(form.store_id)] : [],
+    };
+
     try {
-      await apiCreateTenant({
-        business_name: form.business_name.trim(),
-        business_type: form.business_type.trim(),
-        email: form.email.trim(),
-        phone_number: form.phone_number.trim(),
-        store_ids: form.store_id ? [Number(form.store_id)] : [],
-      });
+      if (tenantToEdit) {
+        await apiUpdateTenant(tenantToEdit.tenant_id, tenantData);
+      } else {
+        await apiCreateTenant(tenantData);
+      }
 
       setForm({ ...EMPTY_FORM });
       setShowAdd(false);
+      setTenantToEdit(null);
       setRefresh((current) => current + 1);
     } catch (err) {
       setActionError(err.message);
@@ -128,18 +168,22 @@ export default function TenantsView() {
     return <LoadingSpinner label="Loading tenants..." />;
   }
 
-  const availableStores = form.mall_id
-    ? stores.filter(
-        (store) =>
-          store.mall_id === Number(form.mall_id) &&
-          store.status === "available",
-      )
-    : stores.filter((store) => store.status === "available");
+  const availableStores = stores.filter((store) => {
+    const matchesMall =
+      !form.mall_id || String(store.mall_id) === String(form.mall_id);
+
+    const isAvailable = store.status === "available";
+    const isCurrentStore =
+      tenantToEdit && String(store.store_id) === String(form.store_id);
+
+    return matchesMall && (isAvailable || isCurrentStore);
+  });
 
   const closeAddModal = () => {
     if (saving) return;
 
     setShowAdd(false);
+    setTenantToEdit(null);
     setActionError(null);
   };
 
@@ -156,13 +200,7 @@ export default function TenantsView() {
         title="All Tenants"
         subtitle="All tenants across all malls"
         action={
-          <button
-            onClick={() => {
-              setActionError(null);
-              setShowAdd(true);
-            }}
-            className="btn-primary text-sm"
-          >
+          <button onClick={openAddModal} className="btn-primary text-sm">
             <Plus size={16} />
             Add Tenant
           </button>
@@ -247,18 +285,34 @@ export default function TenantsView() {
             },
             {
               key: "actions",
-              label: "",
+              label: "Actions",
               render: (tenant) => (
-                <button
-                  onClick={() => {
-                    setActionError(null);
-                    setTenantToRemove(tenant);
-                  }}
-                  className="rounded-lg p-1.5 text-red-500 hover:bg-red-50"
-                  title="Remove tenant"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(tenant)}
+                    disabled={saving || deleting}
+                    className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                    title="Update tenant"
+                    aria-label={`Update ${tenant.business_name}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionError(null);
+                      setTenantToRemove(tenant);
+                    }}
+                    disabled={saving || deleting}
+                    className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                    title="Remove tenant"
+                    aria-label={`Remove ${tenant.business_name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               ),
             },
           ]}
@@ -270,10 +324,10 @@ export default function TenantsView() {
       <Modal
         open={showAdd}
         onClose={closeAddModal}
-        title="Add Tenant"
+        title={tenantToEdit ? "Update Tenant" : "Add Tenant"}
         size="md"
       >
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="label">Business Name</label>
             <input
@@ -363,7 +417,13 @@ export default function TenantsView() {
             disabled={saving}
             className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Creating..." : "Create Tenant"}
+            {saving
+              ? tenantToEdit
+                ? "Updating..."
+                : "Creating..."
+              : tenantToEdit
+                ? "Update Tenant"
+                : "Create Tenant"}
           </button>
         </form>
       </Modal>
