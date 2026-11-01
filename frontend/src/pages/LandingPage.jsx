@@ -12,6 +12,7 @@ import { useRouter } from "@/context/RouterContext.jsx";
 import { useAuth } from "@/context/AuthContext.jsx";
 import {
   apiGetMalls,
+  apiGetNearestMalls,
   apiGetStoresByMall,
   apiGetTopSellingProducts,
   apiGetAvailableStores,
@@ -29,14 +30,12 @@ export default function LandingPage() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [suggestions, setSuggestions] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [bidEvent, setBidEvent] = useState(null);
   const { navigate } = useRouter();
   const { user } = useAuth();
-  const [userLatitue, setUserLatitude] = useState();
-  const [userLongitude, setUserLongitude] = useState();
+  const [nearby, setNearby] = useState(false);
+  const [nearbyError, setNearbyError] = useState("");
 
   // Malls shown in the home grid.
   const [malls, setMalls] = useState([]);
@@ -71,6 +70,7 @@ export default function LandingPage() {
   // come from the same existing per-mall endpoints the detail view already uses.
   useEffect(() => {
     const q = searchQuery.trim();
+    setNearby(false);
     let cancelled = false;
     (async () => {
       try {
@@ -108,23 +108,6 @@ export default function LandingPage() {
       cancelled = true;
     };
   }, [searchQuery]);
-
-  // Type-ahead suggestions come from the same search endpoint, limited to 6 rows.
-  useEffect(() => {
-    const q = searchInput.trim();
-    if (!q || q === searchQuery.trim()) {
-      setSuggestions([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        setSuggestions(await apiGetMalls({ q, page: 0, size: 6 }));
-      } catch {
-        setSuggestions([]);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [searchInput, searchQuery]);
 
   // Stores, top products and availability of the opened mall.
   useEffect(() => {
@@ -200,11 +183,6 @@ export default function LandingPage() {
     setView("properties");
   };
 
-  const handleSuggestionClick = (mall) => {
-    setSearchInput(mall.mall_name);
-    setSearchQuery(mall.mall_name);
-  };
-
   const handleSearchRequest = (event) => {
     event.preventDefault();
     setSearchQuery(searchInput);
@@ -222,23 +200,38 @@ export default function LandingPage() {
     }
   };
 
-  const geoFindMe = () => {
-    function success(position) {
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
-      setUserLatitude(latitude);
-      setUserLongitude(longitude);
-    }
-
-    function error() {
-      alert("Unable to retrieve your location");
-    }
-
+  // Nearest-first ordering comes from the backend (/api/malls/nearest); the grid
+  // reuses the existing loading/error state, so only the rows swap.
+  const handleFindNearby = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported in your browser");
-    } else {
-      navigator.geolocation.getCurrentPosition(success, error);
+      setNearbyError("Geolocation is not supported by this browser.");
+      return;
     }
+    setNearbyError("");
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          setMallsLoading(true);
+          setMallsError("");
+          const list = await apiGetNearestMalls(
+            coords.latitude,
+            coords.longitude,
+            6,
+          );
+          setMalls(list);
+          setNearby(true);
+        } catch (err) {
+          setMallsError(err.message || "Failed to load nearby malls");
+        } finally {
+          setMallsLoading(false);
+        }
+      },
+      () =>
+        setNearbyError(
+          "Unable to retrieve your location. Allow location access and try again.",
+        ),
+      { timeout: 10000, maximumAge: 60000 },
+    );
   };
 
   return (
@@ -321,85 +314,33 @@ export default function LandingPage() {
                   <input
                     type="text"
                     value={searchInput}
-                    onChange={(e) => {
-                      setSearchInput(e.target.value);
-                      setHighlightedIndex(-1);
-                    }}
-                    onKeyDown={(e) => {
-                      if (
-                        e.key === "ArrowDown" &&
-                        suggestions.length > 0
-                      ) {
-                        e.preventDefault();
-
-                        setHighlightedIndex((prev) =>
-                          prev < suggestions.length - 1 ? prev + 1 : prev,
-                        );
-                      } else if (e.key === "ArrowUp") {
-                        e.preventDefault();
-
-                        setHighlightedIndex((prev) =>
-                          prev !== -1 ? prev - 1 : prev,
-                        );
-                      } else if (e.key === "Enter" && highlightedIndex !== -1) {
-                        e.preventDefault();
-
-                        handleSuggestionClick(suggestions[highlightedIndex]);
-
-                        setHighlightedIndex(-1);
-                      }
-                    }}
-                    placeholder="Search by city or mall name..."
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Search by city or state..."
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm"
                   />
-                  {searchInput !== searchQuery && suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg overflow-hidden z-20">
-                      {suggestions.map((mall, index) => (
-                        <div
-                          key={mall.mall_id}
-                          onClick={() => handleSuggestionClick(mall)}
-                          className={`px-4 py-2 cursor-pointer ${
-                            highlightedIndex === index
-                              ? "bg-slate-200"
-                              : "hover:bg-slate-50"
-                          }`}
-                        >
-                          <p className="text-sm font-medium text-slate-800">
-                            {mall.mall_name}
-                            <span className="ml-2 text-xs font-normal text-slate-400">
-                              {mall.city}, {mall.state}
-                            </span>
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <button
                   type="submit"
-                  onClick={geoFindMe}
                   className="btn bg-white text-brand-700 hover:bg-brand-50 px-5 py-2.5 rounded-lg font-semibold text-sm"
                 >
                   Search
                 </button>
                 <button
-                  onClick={geoFindMe}
+                  onClick={handleFindNearby}
                   className="btn bg-white text-brand-700 hover:bg-brand-50 px-5 py-2.5 rounded-lg font-semibold text-sm"
                 >
                   Find nearby malls
                 </button>
-                <div className="text-white">
-                  {" "}
-                  {userLatitue ? userLatitue : "Find latitude"}{" "}
-                  {userLongitude ? userLongitude : ""}
-                </div>
               </form>
+              {nearbyError && (
+                <p className="text-sm text-amber-200 mt-3">{nearbyError}</p>
+              )}
             </div>
           </section>
 
           <section className="max-w-6xl mx-auto px-4 py-10">
             <h2 className="text-lg font-bold text-slate-900 mb-1">
-              Malls Near You
+              {nearby ? "Nearest malls" : "Malls Near You"}
             </h2>
             <p className="text-sm text-slate-500 mb-6">
               Discover shopping centers in your area

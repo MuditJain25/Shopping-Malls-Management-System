@@ -284,8 +284,10 @@ export async function apiHealth() {
 }
 
 // ── Malls ──────────────────────────────────────────────────────
-export async function apiGetMalls() {
-  const data = await apiFetch("/malls");
+export async function apiGetMalls({ q } = {}) {
+  // The backend search (MallRepository.search) matches city, state and description.
+  const qs = q ? `?${new URLSearchParams({ q })}` : "";
+  const data = await apiFetch(`/malls${qs}`);
   return unwrap(data).map(normalizeMall);
 }
 
