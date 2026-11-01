@@ -16,5 +16,6 @@ Make the backend
   "Assign Store" dropdown is ignored; use "Manage tenants" on the Stores tab to link.
 - Link/unlink does not touch `store.status` (available/occupied), so bidding and
   `GET /stores/available` can still show a store that has a tenant. To be discussed with bidding.
+- Wire `ExecutiveDashboardComponents/RevenueReportsView.jsx` to `apiGetAllRevenueReports` (rows have `tenant_id`, `information_id`, `description` only: no store or date, so its store filter/date columns need rethinking) and tenant `TransactionsView.jsx` to `apiGetMallsByTenant`; `apiDeleteRevenue` is available for the tenant revenue page.
 - Revenue UI (`RevenueView.jsx`) still reads mock data and has an amount field; the API stores
   `description` only (pending P2).

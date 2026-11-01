@@ -129,4 +129,17 @@ public class TenantController {
                                 @Valid @RequestBody PeopleDtos.RevenueCreateRequest req) {
         return tenants.updateRevenue(id, infoId, req);
     }
+
+    @DeleteMapping("/{id}/revenue/{infoId}")
+    @PreAuthorize("hasRole('TENANT') and @access.canAccessTenant(#id)")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRevenue(@PathVariable Integer id, @PathVariable Integer infoId) {
+        tenants.deleteRevenue(id, infoId);
+    }
+
+    @GetMapping("/{id}/malls")
+    @PreAuthorize("hasAnyRole('TENANT','MALL_MANAGER','EXECUTIVE') and @access.canAccessTenant(#id)")
+    public Object malls(@PathVariable Integer id) {
+        return tenants.mallsByTenant(id);
+    }
 }

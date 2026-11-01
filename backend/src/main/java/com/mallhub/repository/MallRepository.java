@@ -22,6 +22,15 @@ public interface MallRepository extends JpaRepository<Mall, Integer> {
     Page<Mall> search(@Param("q") String q, @Param("city") String city, Pageable pageable);
 
     @Query("""
+            SELECT DISTINCT m FROM Mall m
+            JOIN Store s ON s.mallId = m.mallId
+            JOIN StoreTenant st ON st.id.storeId = s.storeId
+            WHERE st.id.tenantId = :tenantId
+            ORDER BY m.mallId
+            """)
+    List<Mall> findByTenant(@Param("tenantId") Integer tenantId);
+
+    @Query("""
             SELECT m FROM Mall m
             WHERE m.mallId IN (SELECT o.id.mallId FROM ExecutiveOverseesMall o
                                WHERE o.id.executiveId = :executiveId)

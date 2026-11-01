@@ -79,6 +79,9 @@
 //   GET    /api/tenants/{id}/revenue → Revenue[]
 //   POST   /api/tenants/{id}/revenue → Revenue 201
 //   PUT    /api/tenants/{id}/revenue/{infoId} → Revenue
+//   DELETE /api/tenants/{id}/revenue/{infoId} → 204 (tenant, own reports)
+//   GET    /api/tenants/{id}/malls → Mall[]
+//   GET    /api/revenue?mallId= → Revenue[] (all reports; exec all, manager own mall's tenants)
 //
 // ── Employees ───────────────────────────────────────────────────
 //   POST   /api/employees → Employee 201
@@ -600,6 +603,11 @@ export async function apiGetStoresByTenant(tenantId) {
   return apiFetch(`/tenants/${tenantId}/stores`);
 }
 
+export async function apiGetMallsByTenant(tenantId) {
+  const data = await apiFetch(`/tenants/${tenantId}/malls`);
+  return unwrap(data).map(normalizeMall);
+}
+
 // GET /api/counts: counts come straight from the DB. include = ["tenants","stores","employees","products"]
 // (default all); groupBy = "mall" (executive only) returns one row per mall; manager is pinned to own mall.
 export async function apiGetCounts({ mallId, include, groupBy } = {}) {
@@ -658,6 +666,17 @@ export async function apiUpdateEmployee(id, employeeData) {
 export async function apiGetRevenueByTenant(tenantId) {
   const data = await apiFetch(`/tenants/${tenantId}/revenue`);
   return unwrap(data);
+}
+
+// All revenue reports: rows are {tenant_id, information_id, description} only (no store/date in the table).
+export async function apiGetAllRevenueReports({ mallId } = {}) {
+  const qs = mallId ? `?mallId=${encodeURIComponent(mallId)}` : "";
+  const data = await apiFetch(`/revenue${qs}`);
+  return unwrap(data);
+}
+
+export async function apiDeleteRevenue(tenantId, infoId) {
+  return apiFetch(`/tenants/${tenantId}/revenue/${infoId}`, { method: "DELETE" });
 }
 
 export async function apiSubmitRevenue(tenantId, { description }) {

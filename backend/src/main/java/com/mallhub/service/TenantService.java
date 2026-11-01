@@ -26,10 +26,15 @@ public class TenantService {
     private final EmployeeRepository employees;
     private final TransactionRepository transactions;
     private final RevenueRepository revenue;
+    private final MallRepository malls;
+    private final MallService mallService;
 
     public TenantService(TenantRepository tenants, StoreTenantRepository joins,
                          StoreRepository stores, EmployeeRepository employees,
-                         TransactionRepository transactions, RevenueRepository revenue) {
+                         TransactionRepository transactions, RevenueRepository revenue,
+                         MallRepository malls, MallService mallService) {
+        this.malls = malls;
+        this.mallService = mallService;
         this.tenants = tenants;
         this.joins = joins;
         this.stores = stores;
@@ -131,6 +136,23 @@ public class TenantService {
         row.setDescription(req.description());
         revenue.save(row);
         return toRevenue(row);
+    }
+
+    public Page<PeopleDtos.RevenueResponse> allRevenue(Integer mallId, Pageable pageable) {
+        return (mallId == null ? revenue.findAllOrdered(pageable) : revenue.findByMall(mallId, pageable))
+                .map(TenantService::toRevenue);
+    }
+
+    @Transactional
+    public void deleteRevenue(Integer tenantId, Integer infoId) {
+        var row = revenue.findById(new RevenueInformation.Id(tenantId, infoId))
+                .orElseThrow(() -> ApiException.notFound("Revenue information"));
+        revenue.delete(row);
+    }
+
+    public List<MallDtos.MallResponse> mallsByTenant(Integer tenantId) {
+        require(tenantId);
+        return mallService.toResponses(malls.findByTenant(tenantId));
     }
 
     @Transactional

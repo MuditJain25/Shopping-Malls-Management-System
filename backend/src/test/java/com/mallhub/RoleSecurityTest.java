@@ -13,7 +13,9 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -392,6 +394,54 @@ class RoleSecurityTest {
                 .andExpect(jsonPath("$.description").value("v2"));
         send(put(path), "tenant", 2, "{\"description\":\"hijack\"}").andExpect(status().isForbidden());
         send(put("/api/tenants/1/revenue/99999"), "tenant", 1, "{\"description\":\"x\"}")
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void tenantCanDeleteOwnRevenueOnly() throws Exception {
+        MvcResult created = send(post("/api/tenants/1/revenue"), "tenant", 1,
+                "{\"description\":\"to delete\"}").andExpect(status().isCreated()).andReturn();
+        int infoId = JsonPath.read(created.getResponse().getContentAsString(), "$.information_id");
+        String path = "/api/tenants/1/revenue/" + infoId;
+        mvc.perform(delete(path).header("Authorization", auth("tenant", 2))).andExpect(status().isForbidden());
+        mvc.perform(delete(path).header("Authorization", auth("mall_manager", 1))).andExpect(status().isForbidden());
+        mvc.perform(delete(path).header("Authorization", auth("executive", 1))).andExpect(status().isForbidden());
+        mvc.perform(delete(path).header("Authorization", auth("tenant", 1))).andExpect(status().isNoContent());
+        mvc.perform(delete(path).header("Authorization", auth("tenant", 1))).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void allRevenueIsScopedByRole() throws Exception {
+        send(post("/api/tenants/1/revenue"), "tenant", 1, "{\"description\":\"scoped-report\"}")
+                .andExpect(status().isCreated());
+        // tenant 1 rents in malls 1 and 3, not mall 2
+        mvc.perform(get("/api/revenue").header("Authorization", auth("executive", 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].description").value(hasItem("scoped-report")));
+        mvc.perform(get("/api/revenue").header("Authorization", auth("mall_manager", 1)))
+                .andExpect(jsonPath("$[*].description").value(hasItem("scoped-report")));
+        mvc.perform(get("/api/revenue").header("Authorization", auth("mall_manager", 2)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].description").value(not(hasItem("scoped-report"))));
+        mvc.perform(get("/api/revenue").param("mallId", "2").header("Authorization", auth("mall_manager", 1)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/revenue").param("mallId", "2").header("Authorization", auth("executive", 1)))
+                .andExpect(jsonPath("$[*].description").value(not(hasItem("scoped-report"))));
+        for (String role : new String[]{"customer", "tenant", "shop_manager"}) {
+            mvc.perform(get("/api/revenue").header("Authorization", auth(role, 1)))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void tenantMallsAreListedForOwnerOnly() throws Exception {
+        mvc.perform(get("/api/tenants/1/malls").header("Authorization", auth("tenant", 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[*].mall_id").value(containsInAnyOrder(1, 3)));
+        mvc.perform(get("/api/tenants/1/malls").header("Authorization", auth("tenant", 2)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/tenants/99999/malls").header("Authorization", auth("executive", 1)))
                 .andExpect(status().isNotFound());
     }
 

@@ -382,6 +382,9 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | GET | `/tenants/{id}/revenue` | — | `Revenue[]` | tenant,exec | `description` only; `month/amount/submitted_date` still deferred (pending P2) |
 | POST | `/tenants/{id}/revenue` | `{description}` | `Revenue 201` | tenant | as above |
 | PUT | `/tenants/{id}/revenue/{infoId}` | `{description}` | `Revenue` | tenant | as above; 404 if missing |
+| DELETE | `/tenants/{id}/revenue/{infoId}` | — | `204` | tenant | own reports only, no time limit (table has no date); 404 if missing |
+| GET | `/tenants/{id}/malls` | — | `Mall[]` | tenant(self),mall_manager,exec | distinct malls of the tenant's linked stores, one SQL query |
+| GET | `/revenue` | `?mallId=&page=&size=` | `Revenue[]` | exec,mall_manager | all reports, `{tenant_id,information_id,description}` only (no store/date/name); exec: all or `mallId`; manager: tenants renting in own mall |
 | GET | `/tenants/{id}/transactions` | — | `Txn[]` | tenant | `sender = tenant.business_name` |
 | GET | `/transactions` | — | `Txn[]` | tenant,shop_manager,mall_manager,exec | all rows (no per-row owner); `?mallId=` removed — sender/receiver are account values, not mall ids |
 | POST | `/transactions` | `{amount,sender,receiver,sender_type,receiver_type,transaction_date,remarks}` | `Txn 201` | tenant,shop_manager,mall_manager,exec | only `amount` required; date defaults to today |
