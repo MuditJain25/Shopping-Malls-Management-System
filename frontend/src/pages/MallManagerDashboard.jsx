@@ -13,7 +13,6 @@ import EmployeesView from "./MallManagerDashboardComponents/EmployeesView";
 import StoresView from "./MallManagerDashboardComponents/StoresView";
 import TenantsView from "./MallManagerDashboardComponents/TenantsView";
 import TransactionsView from "./MallManagerDashboardComponents/TransactionsView";
-import RevenueReports from "./MallManagerDashboardComponents/RevenueView";
 import BiddingView from "./MallManagerDashboardComponents/BiddingView";
 
 export default function MallManagerDashboard() {
@@ -63,7 +62,6 @@ export default function MallManagerDashboard() {
   if (pageKey === "stores") return <StoresView mallId={mallId} />;
   if (pageKey === "tenants") return <TenantsView mallId={mallId} />;
   if (pageKey === "transactions") return <TransactionsView mallId={mallId} />;
-  if (pageKey === "revenue-reports") return <RevenueReports mallId={mallId} />;
   if (pageKey === "bidding") return <BiddingView mallId={mallId} />;
   return <Overview mallId={mallId} manager={manager} />;
 }

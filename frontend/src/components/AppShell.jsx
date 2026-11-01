@@ -57,11 +57,6 @@ const NAV_CONFIG = {
       path: "/app/shop-manager/leave",
       icon: FileText,
     },
-    {
-      label: "Transactions",
-      path: "/app/shop-manager/transactions",
-      icon: BarChart3,
-    },
   ],
   mall_manager: [
     { label: "Overview", path: "/app/mall-manager", icon: Home },
@@ -72,11 +67,6 @@ const NAV_CONFIG = {
       label: "Transactions",
       path: "/app/mall-manager/transactions",
       icon: FileText,
-    },
-    {
-      label: "Revenue Reports",
-      path: "/app/mall-manager/revenue-reports",
-      icon: CalendarCheck,
     },
     {
       label: "Bidding Control",
@@ -99,6 +89,11 @@ const NAV_CONFIG = {
     { label: "Tenants", path: "/app/executive/tenants", icon: Users },
     { label: "Bid Events", path: "/app/executive/bids", icon: Gavel },
     { label: "Analytics", path: "/app/executive/analytics", icon: BarChart3 },
+    {
+      label: "Revenue Reports",
+      path: "/app/mall-manager/revenue-reports",
+      icon: CalendarCheck,
+    },
   ],
   employee: [
     { label: "Dashboard", path: "/app/employee", icon: Home },

@@ -21,7 +21,7 @@ const getStoreName = (report) =>
   report.store?.name ??
   "Unknown Store";
 
-export default function RevenueReports({ mallId }) {
+export default function RevenueReports() {
   const [reports, setReports] = useState([]);
   const [selectedStore, setSelectedStore] = useState("all");
   const [loading, setLoading] = useState(true);

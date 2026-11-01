@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 import { useRouter } from "@/context/RouterContext.jsx";
 import { LoadingSpinner } from "@/components/ui/index.jsx";
-import { apiGetStoresByTenant, apiGetStoreById } from "@/lib/api";
+import {
+  apiGetStoresByTenant,
+  apiGetStoreById,
+  apiGetTenantById,
+} from "@/lib/api";
 
 import Overview from "./TenantDashboardComponents/Overview";
 import StoresView from "./TenantDashboardComponents/StoresView";
@@ -21,10 +25,34 @@ export default function TenantDashboard({ role = "tenant" }) {
   const isShopManager = role === "shop_manager";
   const profileId = user?.profileId;
 
+  const [tenant, setTenant] = useState(null);
   const [tenantStores, setTenantStores] = useState([]);
   const [shopManagerStore, setShopManagerStore] = useState(null);
   const [storesLoading, setStoresLoading] = useState(true);
   const [storesError, setStoresError] = useState("");
+
+  useEffect(() => {
+    if (isShopManager || profileId == null) {
+      setTenant(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    apiGetTenantById(profileId)
+      .then((data) => {
+        if (!cancelled) {
+          setTenant(data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch tenant details:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, isShopManager]);
 
   useEffect(() => {
     if (!user) return;
@@ -150,15 +178,16 @@ export default function TenantDashboard({ role = "tenant" }) {
   if (pageKey === "transactions") {
     return (
       <TransactionsView
-        tenantId={isShopManager ? null : profileId}
-        isShopManager={isShopManager}
-        stores={activeStores}
+        tenantId={profileId}
+        tenantName={tenant?.business_name}
       />
     );
   }
 
   if (pageKey === "revenue") {
-    return <RevenueView tenantId={isShopManager ? null : profileId} />;
+    return (
+      <RevenueView tenantId={profileId} tenantName={tenant?.business_name} />
+    );
   }
 
   return (
