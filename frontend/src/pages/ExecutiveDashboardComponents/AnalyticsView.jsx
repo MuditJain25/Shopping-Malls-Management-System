@@ -1,78 +1,111 @@
 import { useState, useEffect } from "react";
-import {
-  Building2,
-  Users,
-  Store,
-  DollarSign,
-  TrendingUp,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { PageHeader, DataTable } from "@/components/ui/index.jsx";
+import { apiGetCounts, apiGetMalls } from "@/lib/api.js";
 
-import {
-  PageHeader,
-  LoadingSpinner,
-  ErrorState,
-} from "@/components/ui/index.jsx";
+// Extract count rows.
+function getMallRows(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.rows)) return data.rows;
+  if (Array.isArray(data?.malls)) return data.malls;
+  if (Array.isArray(data?.data)) return data.data;
 
-import {
-  apiGetMalls,
-  apiGetStores,
-  apiGetTenants,
-  apiGetTransactionsByMall,
-  apiGetEmployeesByMall,
-} from "@/lib/api.js";
+  throw new Error("Invalid mall analytics response.");
+}
+
+// Extract mall ID.
+function getMallId(row) {
+  return row.mall_id ?? row.mallId ?? row.mall?.mall_id ?? row.mall?.id;
+}
+
+// Resolve mall name using the mall records.
+function getMallName(row, mallsById) {
+  const mallId = getMallId(row);
+
+  return (
+    mallsById.get(String(mallId)) ??
+    row.mall_name ??
+    row.mallName ??
+    row.mall?.mall_name ??
+    row.mall?.name ??
+    "Unknown Mall"
+  );
+}
+
+// Extract count values.
+function getCount(row, field) {
+  const singular = field.slice(0, -1);
+
+  const value =
+    row[field] ??
+    row[`${field}_count`] ??
+    row[`${field}_counts`] ??
+    row[`${field}Count`] ??
+    row[`${singular}_count`] ??
+    row[`${singular}Count`] ??
+    row.counts?.[field] ??
+    row.counts?.[singular] ??
+    0;
+
+  const count = Number(value);
+  return Number.isFinite(count) ? count : 0;
+}
 
 export default function AnalyticsView() {
-  const [analytics, setAnalytics] = useState(null);
-  const [error, setError] = useState(null);
-  const [expandedMalls, setExpandedMalls] = useState([]);
+  const [analytics, setAnalytics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadAnalytics() {
       try {
-        const malls = await apiGetMalls();
+        setLoading(true);
+        setError("");
 
-        const results = await Promise.all(
-          malls.map(async (mall) => {
-            const [transactions, tenants, stores, employees] =
-              await Promise.all([
-                apiGetTransactionsByMall(mall.mall_id),
-                apiGetTenants(mall.mall_id),
-                apiGetStores(mall.mall_id),
-                apiGetEmployeesByMall(mall.mall_id),
-              ]);
-
-            const occupiedStores = stores.filter(
-              (store) => store.status === "occupied",
-            );
-
-            const totalRevenue = transactions.reduce((sum, transaction) => {
-              const amount = Number(transaction.amount ?? 0);
-              return sum + (Number.isFinite(amount) ? amount : 0);
-            }, 0);
-
-            return {
-              mall,
-              totalRevenue,
-              customerCount: null,
-              avgRevenuePerStore: occupiedStores.length
-                ? Math.round(totalRevenue / occupiedStores.length)
-                : 0,
-              partnerCount: tenants.length,
-              employeeCount: employees.length,
-            };
+        // Fetch mall names and grouped counts together.
+        const [malls, countsData] = await Promise.all([
+          apiGetMalls(),
+          apiGetCounts({
+            include: ["tenants", "stores", "employees", "products"],
+            groupBy: "mall",
           }),
+        ]);
+
+        if (cancelled) return;
+
+        if (!Array.isArray(malls)) {
+          throw new Error("Invalid malls response.");
+        }
+
+        // Map mall ID to mall name.
+        const mallsById = new Map(
+          malls.map((mall) => [String(mall.mall_id), mall.mall_name]),
         );
 
-        if (!cancelled) {
-          setAnalytics(results);
-        }
+        const rows = getMallRows(countsData);
+
+        const formattedRows = rows.map((row) => ({
+          mall_id: getMallId(row),
+          mall_name: getMallName(row, mallsById),
+          tenants: getCount(row, "tenants"),
+          stores: getCount(row, "stores"),
+          employees: getCount(row, "employees"),
+          products: getCount(row, "products"),
+        }));
+
+        // Sort alphabetically by mall name.
+        formattedRows.sort((a, b) => a.mall_name.localeCompare(b.mall_name));
+
+        setAnalytics(formattedRows);
       } catch (err) {
         if (!cancelled) {
+          console.error("Failed to load mall analytics:", err);
           setError(err.message || "Failed to load mall analytics.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     }
@@ -84,156 +117,67 @@ export default function AnalyticsView() {
     };
   }, []);
 
-  const toggleMall = (mallId) => {
-    setExpandedMalls((previous) =>
-      previous.includes(mallId)
-        ? previous.filter((id) => id !== mallId)
-        : [...previous, mallId],
-    );
-  };
-
-  if (error) {
-    return <ErrorState message={error} />;
-  }
-
-  if (!analytics) {
-    return <LoadingSpinner label="Loading mall analytics..." />;
-  }
-
   return (
     <div>
       <PageHeader
         title="Mall Performance Analytics"
-        subtitle="Revenue, customers, and partner metrics per mall"
+        subtitle="Tenants, stores, employees, and products across all malls"
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {analytics.map((item) => {
-          const {
-            mall,
-            totalRevenue,
-            customerCount,
-            avgRevenuePerStore,
-            partnerCount,
-            employeeCount,
-          } = item;
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-slate-500">
+            Loading mall analytics...
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-red-600 mb-3">{error}</p>
 
-          const isExpanded = expandedMalls.includes(mall.mall_id);
-
-          const location = [mall.city, mall.state].filter(Boolean).join(", ");
-
-          const mallName =
-            mall.mall_name && mall.mall_name !== mall.city
-              ? mall.mall_name
-              : location || `Mall ${mall.mall_id}`;
-
-          const showLocation = location && location !== mallName;
-
-          return (
-            <div key={mall.mall_id} className="card p-4">
-              <button
-                type="button"
-                className="w-full flex items-center justify-between gap-3 text-left"
-                onClick={() => toggleMall(mall.mall_id)}
-                aria-expanded={isExpanded}
-                aria-controls={`mall-analytics-${mall.mall_id}`}
-                aria-label={`${isExpanded ? "Collapse" : "Expand"} analytics for ${mallName}`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Building2 size={18} className="text-brand-600 shrink-0" />
-
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-slate-900 text-sm">
-                      {mallName}
-                    </h3>
-
-                    {showLocation && (
-                      <p className="text-xs text-slate-400">{location}</p>
-                    )}
-                  </div>
-                </div>
-
-                {isExpanded ? (
-                  <ChevronUp size={18} className="text-slate-500 shrink-0" />
-                ) : (
-                  <ChevronDown size={18} className="text-slate-500 shrink-0" />
-                )}
-              </button>
-
-              <div
-                id={`mall-analytics-${mall.mall_id}`}
-                className={`space-y-2 mt-3 ${isExpanded ? "" : "hidden"}`}
-              >
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                  <span className="flex items-center gap-2 text-sm text-slate-500">
-                    <DollarSign size={14} />
-                    Revenue
+            <button
+              onClick={() => window.location.reload()}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              {
+                key: "mall_name",
+                label: "Mall",
+                render: (r) => (
+                  <span className="font-medium text-slate-800">
+                    {r.mall_name}
                   </span>
-
-                  <span className="font-bold text-slate-900 text-sm">
-                    ${totalRevenue.toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                  <span className="flex items-center gap-2 text-sm text-slate-500">
-                    <Users size={14} />
-                    Customers
-                  </span>
-
-                  <span
-                    className="font-bold text-slate-900 text-sm"
-                    title="Customer counts are not currently available from the backend."
-                  >
-                    {customerCount === null
-                      ? "N/A"
-                      : customerCount.toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                  <span className="flex items-center gap-2 text-sm text-slate-500">
-                    <TrendingUp size={14} />
-                    Avg/Store
-                  </span>
-
-                  <span className="font-bold text-slate-900 text-sm">
-                    ${avgRevenuePerStore.toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                  <span className="flex items-center gap-2 text-sm text-slate-500">
-                    <Store size={14} />
-                    Partners
-                  </span>
-
-                  <span className="font-bold text-slate-900 text-sm">
-                    {partnerCount.toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                  <span className="flex items-center gap-2 text-sm text-slate-500">
-                    <Users size={14} />
-                    Employees
-                  </span>
-
-                  <span className="font-bold text-slate-900 text-sm">
-                    {employeeCount.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                ),
+              },
+              {
+                key: "tenants",
+                label: "Tenants",
+                render: (r) => r.tenants.toLocaleString(),
+              },
+              {
+                key: "stores",
+                label: "Stores",
+                render: (r) => r.stores.toLocaleString(),
+              },
+              {
+                key: "employees",
+                label: "Employees",
+                render: (r) => r.employees.toLocaleString(),
+              },
+              {
+                key: "products",
+                label: "Products",
+                render: (r) => r.products.toLocaleString(),
+              },
+            ]}
+            rows={analytics}
+            emptyMessage="No mall analytics available."
+          />
+        )}
       </div>
-
-      {analytics.length === 0 && (
-        <div className="card p-6 text-center text-slate-500 text-sm">
-          No malls found.
-        </div>
-      )}
     </div>
   );
 }

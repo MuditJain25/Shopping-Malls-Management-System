@@ -1,21 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { PageHeader, DataTable } from "@/components/ui/index.jsx";
 import Modal from "@/components/ui/Modal.jsx";
-import { apiGetRevenueByTenant, apiSubmitRevenue } from "@/lib/api.js";
+import {
+  apiGetRevenueByTenant,
+  apiSubmitRevenue,
+  apiDeleteRevenue,
+} from "@/lib/api.js";
 
 const REPORT_DATE_PREFIX = "Report Date: ";
 const TENANT_NAME_PREFIX = "Tenant Name: ";
 
 const createReportInfo = (report, fallbackTenantName) => {
   const lines = String(report.description || "").split(/\r?\n/);
-
-  // New format:
-  // Heading
-  // Report Date: YYYY-MM-DD
-  // Tenant Name: Business Name
-  //
-  // Report details...
 
   const hasMetadata =
     lines[1]?.startsWith(REPORT_DATE_PREFIX) &&
@@ -33,7 +30,7 @@ const createReportInfo = (report, fallbackTenantName) => {
     };
   }
 
-  // Backward compatibility with previously submitted reports.
+  // Backward compatibility with older reports.
   return {
     heading: lines[0]?.trim() || "Untitled Report",
     reportDate: "",
@@ -60,6 +57,11 @@ export default function RevenueView({ tenantId, tenantName }) {
 
   const [selectedReport, setSelectedReport] = useState(null);
 
+  // Delete report state.
+  const [reportToDelete, setReportToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   // Fetch revenue reports.
   const fetchReports = useCallback(async () => {
     if (tenantId == null) {
@@ -73,8 +75,6 @@ export default function RevenueView({ tenantId, tenantName }) {
       setError("");
 
       const data = await apiGetRevenueByTenant(tenantId);
-
-      // API already unwraps the response.
       setReports(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch revenue reports:", err);
@@ -114,7 +114,6 @@ export default function RevenueView({ tenantId, tenantName }) {
       setSubmitting(true);
       setFormError("");
 
-      // Store all report information in the existing description field.
       const description = [
         heading.trim(),
         `${REPORT_DATE_PREFIX}${reportDate}`,
@@ -136,6 +135,48 @@ export default function RevenueView({ tenantId, tenantName }) {
       setFormError(err.message || "Failed to submit revenue report.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Delete a revenue report.
+  const handleDelete = async () => {
+    if (!reportToDelete) return;
+
+    if (reportToDelete.information_id == null) {
+      setDeleteError("Revenue report ID is unavailable.");
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setDeleteError("");
+
+      await apiDeleteRevenue(tenantId, reportToDelete.information_id);
+
+      // Remove the deleted report from the UI.
+      setReports((previous) =>
+        previous.filter(
+          (report) =>
+            String(report.information_id) !==
+            String(reportToDelete.information_id),
+        ),
+      );
+
+      // Close the report details modal if it was open.
+      if (
+        selectedReport &&
+        String(selectedReport.information_id) ===
+          String(reportToDelete.information_id)
+      ) {
+        setSelectedReport(null);
+      }
+
+      setReportToDelete(null);
+    } catch (err) {
+      console.error("Failed to delete revenue report:", err);
+      setDeleteError(err.message || "Failed to delete revenue report.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -225,7 +266,7 @@ export default function RevenueView({ tenantId, tenantName }) {
               },
               {
                 key: "description",
-                label: "Report",
+                label: "Report Title",
                 render: (r) => {
                   const info = createReportInfo(r, tenantName);
 
@@ -239,6 +280,24 @@ export default function RevenueView({ tenantId, tenantName }) {
                     </button>
                   );
                 },
+              },
+              {
+                key: "actions",
+                label: "Action",
+                render: (r) => (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteError("");
+                      setReportToDelete(r);
+                    }}
+                    className="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+                    title="Delete report"
+                    aria-label="Delete revenue report"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                ),
               },
             ]}
             rows={reports}
@@ -257,7 +316,6 @@ export default function RevenueView({ tenantId, tenantName }) {
         size="lg"
       >
         <div className="space-y-4">
-          {/* Tenant Name */}
           <div>
             <label className="label">Tenant Name</label>
             <input
@@ -269,7 +327,6 @@ export default function RevenueView({ tenantId, tenantName }) {
             />
           </div>
 
-          {/* Report Date */}
           <div>
             <label className="label">Report Date</label>
             <input
@@ -281,7 +338,6 @@ export default function RevenueView({ tenantId, tenantName }) {
             />
           </div>
 
-          {/* Report Heading */}
           <div>
             <label className="label">Report Heading</label>
             <input
@@ -295,7 +351,6 @@ export default function RevenueView({ tenantId, tenantName }) {
             />
           </div>
 
-          {/* Report Details */}
           <div>
             <label className="label">Report Details</label>
             <textarea
@@ -366,6 +421,63 @@ export default function RevenueView({ tenantId, tenantName }) {
               </div>
             );
           })()}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={reportToDelete !== null}
+        onClose={() => {
+          if (!deleting) {
+            setReportToDelete(null);
+            setDeleteError("");
+          }
+        }}
+        title="Delete Revenue Report"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Are you sure you want to delete this revenue report?
+          </p>
+
+          {reportToDelete && (
+            <div className="bg-slate-50 rounded-lg p-3">
+              <p className="font-medium text-slate-800">
+                {createReportInfo(reportToDelete, tenantName).heading}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Report Date:{" "}
+                {createReportInfo(reportToDelete, tenantName).reportDate || "-"}
+              </p>
+            </div>
+          )}
+
+          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setReportToDelete(null);
+                setDeleteError("");
+              }}
+              disabled={deleting}
+              className="btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Trash2 size={16} />
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

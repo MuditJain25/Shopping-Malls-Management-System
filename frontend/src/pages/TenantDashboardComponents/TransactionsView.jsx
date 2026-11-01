@@ -1,19 +1,39 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { PageHeader, DataTable } from "@/components/ui/index.jsx";
 import Modal from "@/components/ui/Modal.jsx";
 import {
   apiGetTransactionsByTenant,
   apiCreateTransaction,
-  // apiGetMallsByTenant,
+  apiGetMallsByTenant,
+  // apiDeleteTransaction,
 } from "@/lib/api.js";
 
 const REMARK_PREVIEW_LENGTH = 55;
+const DATE_REMARK_PREFIX = "Date: ";
+
+function getTodayLocalDate() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+// Remove the date metadata before displaying remarks.
+function getDisplayRemarks(remarks) {
+  const lines = String(remarks || "").split(/\r?\n/);
+
+  if (/^Date:\s*\d{4}-\d{2}-\d{2}$/.test(lines[0]?.trim())) {
+    lines.shift();
+  }
+
+  return lines.join("\n").trim();
+}
 
 const createInitialForm = () => ({
   mallId: "",
   amount: "",
-  transactionDate: new Date().toISOString().slice(0, 10),
+  transactionDate: getTodayLocalDate(),
   remarks: "",
 });
 
@@ -35,7 +55,12 @@ export default function TransactionsView({ tenantId, tenantName }) {
 
   const [selectedRemark, setSelectedRemark] = useState(null);
 
-  // Fetch transactions belonging to this tenant.
+  // Transaction deletion state.
+  const [transactionToDelete, setTransactionToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  // Fetch tenant transactions.
   const fetchTransactions = useCallback(async () => {
     if (tenantId == null) {
       setError("Tenant information is unavailable.");
@@ -60,37 +85,33 @@ export default function TransactionsView({ tenantId, tenantName }) {
   }, [tenantId]);
 
   // Fetch malls associated with this tenant.
-  // const fetchMalls = useCallback(async () => {
-  //   if (tenantId == null) {
-  //     setMallsError("Tenant information is unavailable.");
-  //     setMallsLoading(false);
-  //     return;
-  //   }
+  const fetchMalls = useCallback(async () => {
+    if (tenantId == null) {
+      setMallsError("Tenant information is unavailable.");
+      setMallsLoading(false);
+      return;
+    }
 
-  //   try {
-  //     setMallsLoading(true);
-  //     setMallsError("");
+    try {
+      setMallsLoading(true);
+      setMallsError("");
 
-  //     const data = await apiGetMallsByTenant(tenantId);
+      const data = await apiGetMallsByTenant(tenantId);
 
-  //     // API already unwraps and normalizes the response.
-  //     setMalls(data);
-  //   } catch (err) {
-  //     console.error("Failed to fetch tenant malls:", err);
-  //     setMallsError(err.message || "Failed to load malls.");
-  //   } finally {
-  //     setMallsLoading(false);
-  //   }
-  // }, [tenantId]);
-
-  // useEffect(() => {
-  //   fetchTransactions();
-  //   fetchMalls();
-  // }, [fetchTransactions, fetchMalls]);
+      // API already unwraps and normalizes the response.
+      setMalls(data);
+    } catch (err) {
+      console.error("Failed to fetch tenant malls:", err);
+      setMallsError(err.message || "Failed to load malls.");
+    } finally {
+      setMallsLoading(false);
+    }
+  }, [tenantId]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [fetchTransactions]);
+    fetchMalls();
+  }, [fetchTransactions, fetchMalls]);
 
   // Update form fields.
   const updateForm = (field, value) => {
@@ -106,7 +127,7 @@ export default function TransactionsView({ tenantId, tenantName }) {
     [malls, form.mallId],
   );
 
-  // Submit a transaction.
+  // Submit a new transaction.
   const handleSubmit = async () => {
     const amount = Number(form.amount);
 
@@ -120,19 +141,31 @@ export default function TransactionsView({ tenantId, tenantName }) {
       return;
     }
 
-    if (!Number.isFinite(amount) || amount <= 0 || !form.amount) {
+    if (!form.amount || !Number.isFinite(amount) || amount <= 0) {
       setFormError("Please enter a valid transaction amount.");
       return;
     }
 
     if (!form.transactionDate) {
-      setFormError("Please select a transaction date.");
+      setFormError("Please select the transaction date.");
+      return;
+    }
+
+    if (!form.remarks.trim()) {
+      setFormError("Please enter transaction remarks.");
       return;
     }
 
     try {
       setSubmitting(true);
       setFormError("");
+
+      // Always store the transaction date as the first
+      // line of the remarks field.
+      const remarks = [
+        `${DATE_REMARK_PREFIX}${form.transactionDate}`,
+        form.remarks.trim(),
+      ].join("\n");
 
       await apiCreateTransaction({
         amount,
@@ -141,7 +174,7 @@ export default function TransactionsView({ tenantId, tenantName }) {
         senderType: "tenant",
         receiverType: "mall",
         transactionDate: form.transactionDate,
-        remarks: form.remarks.trim(),
+        remarks,
       });
 
       setForm(createInitialForm());
@@ -156,7 +189,35 @@ export default function TransactionsView({ tenantId, tenantName }) {
     }
   };
 
-  // Sort newest first and assign serial numbers.
+  // Open delete confirmation.
+  const confirmDelete = (transaction) => {
+    setDeleteError("");
+    setTransactionToDelete(transaction);
+  };
+
+  // Delete transaction.
+  const handleDelete = async () => {
+    if (!transactionToDelete) return;
+
+    try {
+      setDeleting(true);
+      setDeleteError("");
+
+      // await apiDeleteTransaction(transactionToDelete.transaction_id);
+
+      setTransactionToDelete(null);
+
+      // Refresh the transaction list.
+      await fetchTransactions();
+    } catch (err) {
+      console.error("Failed to delete transaction:", err);
+      setDeleteError(err.message || "Failed to delete transaction.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Sort newest transactions first and assign serial numbers.
   const displayTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => {
@@ -264,7 +325,12 @@ export default function TransactionsView({ tenantId, tenantName }) {
                 key: "remarks",
                 label: "Remarks",
                 render: (t) => {
-                  const remark = t.remarks || "";
+                  // Hide the date metadata in the frontend.
+                  const remark = getDisplayRemarks(t.remarks);
+
+                  if (!remark) {
+                    return <span className="text-slate-400 text-xs">-</span>;
+                  }
 
                   if (remark.length > REMARK_PREVIEW_LENGTH) {
                     return (
@@ -280,11 +346,24 @@ export default function TransactionsView({ tenantId, tenantName }) {
                   }
 
                   return (
-                    <span className="text-slate-500 text-xs">
-                      {remark || "-"}
-                    </span>
+                    <span className="text-slate-500 text-xs">{remark}</span>
                   );
                 },
+              },
+              {
+                key: "actions",
+                label: "Action",
+                render: (t) => (
+                  <button
+                    type="button"
+                    onClick={() => confirmDelete(t)}
+                    className="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+                    title="Delete transaction"
+                    aria-label="Delete transaction"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                ),
               },
             ]}
             rows={displayTransactions}
@@ -375,12 +454,17 @@ export default function TransactionsView({ tenantId, tenantName }) {
           <div>
             <label className="label">Remarks</label>
             <textarea
+              required
               className="input min-h-24"
               value={form.remarks}
               onChange={(e) => updateForm("remarks", e.target.value)}
               placeholder="Enter transaction remarks"
               disabled={submitting}
             />
+            <p className="text-xs text-slate-400 mt-1">
+              The transaction date will automatically be stored as the first
+              line of the remarks.
+            </p>
           </div>
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}
@@ -411,6 +495,65 @@ export default function TransactionsView({ tenantId, tenantName }) {
         <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
           {selectedRemark}
         </p>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={transactionToDelete !== null}
+        onClose={() => {
+          if (!deleting) {
+            setTransactionToDelete(null);
+            setDeleteError("");
+          }
+        }}
+        title="Delete Transaction"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Are you sure you want to delete this transaction?
+          </p>
+
+          {transactionToDelete && (
+            <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+              <p className="text-sm font-medium text-slate-800">
+                {transactionToDelete.sender} → {transactionToDelete.receiver}
+              </p>
+              <p className="text-sm text-slate-500">
+                Amount: ${Number(transactionToDelete.amount).toLocaleString()}
+              </p>
+              <p className="text-sm text-slate-500">
+                Date: {transactionToDelete.transaction_date}
+              </p>
+            </div>
+          )}
+
+          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setTransactionToDelete(null);
+                setDeleteError("");
+              }}
+              disabled={deleting}
+              className="btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Trash2 size={16} />
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

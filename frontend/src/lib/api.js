@@ -625,7 +625,9 @@ export async function apiLinkTenantStore(tenantId, storeId) {
 }
 
 export async function apiUnlinkTenantStore(tenantId, storeId) {
-  return apiFetch(`/tenants/${tenantId}/stores/${storeId}`, { method: "DELETE" });
+  return apiFetch(`/tenants/${tenantId}/stores/${storeId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function apiGetEmployeesByTenant(tenantId) {
@@ -670,14 +672,15 @@ export async function apiGetRevenueByTenant(tenantId) {
 }
 
 // All revenue reports: rows are {tenant_id, information_id, description} only (no store/date in the table).
-export async function apiGetAllRevenueReports({ mallId } = {}) {
-  const qs = mallId ? `?mallId=${encodeURIComponent(mallId)}` : "";
-  const data = await apiFetch(`/revenue${qs}`);
+export async function apiGetAllRevenueReports() {
+  const data = await apiFetch(`/revenue`);
   return unwrap(data);
 }
 
 export async function apiDeleteRevenue(tenantId, infoId) {
-  return apiFetch(`/tenants/${tenantId}/revenue/${infoId}`, { method: "DELETE" });
+  return apiFetch(`/tenants/${tenantId}/revenue/${infoId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function apiSubmitRevenue(tenantId, { description }) {
