@@ -600,6 +600,17 @@ export async function apiGetStoresByTenant(tenantId) {
   return apiFetch(`/tenants/${tenantId}/stores`);
 }
 
+// GET /api/counts: counts come straight from the DB. include = ["tenants","stores","employees","products"]
+// (default all); groupBy = "mall" (executive only) returns one row per mall; manager is pinned to own mall.
+export async function apiGetCounts({ mallId, include, groupBy } = {}) {
+  const p = new URLSearchParams();
+  if (mallId) p.set("mallId", mallId);
+  if (include?.length) p.set("include", include.join(","));
+  if (groupBy) p.set("groupBy", groupBy);
+  const qs = p.toString();
+  return apiFetch(`/counts${qs ? `?${qs}` : ""}`);
+}
+
 export async function apiLinkTenantStore(tenantId, storeId) {
   return apiFetch(`/tenants/${tenantId}/stores/${storeId}`, { method: "POST" });
 }

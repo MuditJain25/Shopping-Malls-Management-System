@@ -29,7 +29,7 @@ public class TenantController {
     public Object list(@RequestParam(required = false) Integer mallId,
                        @RequestParam(required = false) Integer page,
                        @RequestParam(required = false) Integer size) {
-        return Paging.shape(tenants.list(access.scopeMall(mallId), Paging.pageable(page, size, "tenantId")), page);
+        return Paging.shape(tenants.list(mallId, Paging.pageable(page, size, "tenantId")), page);
     }
 
     @GetMapping("/{id}")

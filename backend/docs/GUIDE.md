@@ -188,6 +188,8 @@ Second call: row exists with check-in set → 409 "Already checked in today"
    per the frozen schema; persisting the note awaits the `VARCHAR` migration (pending P3).
 9. *Revenue endpoints?* `GET`/`POST`/`PUT /api/tenants/{id}/revenue` exist, `description` only.
    The `month`/`amount`/`submitted_date` columns are still deferred — pending P2.
+   *Counts?* `GET /api/counts` (`include`, `mallId`, `groupBy=mall`) returns DB-computed totals; use it
+   instead of `.length` on fetched lists.
 10. *N+1 queries (e.g. `topProducts` loops repos)?* Fine for tens of rows; would replace with
     a JPQL fetch-join at scale.
 11. *What breaks if someone inserts rows by hand?* Weak-entity ids use per-parent `MAX+1`;

@@ -77,11 +77,12 @@ class RoleSecurityTest {
     }
 
     @Test
-    void managerCannotListAnotherMallsTenants() throws Exception {
+    void managerCanListAllTenants() throws Exception {
+        // tenants are system-level: manager 2 sees tenant 3 who only rents in mall 1
         mvc.perform(get("/api/tenants")
-                        .param("mallId", "2")
-                        .header("Authorization", auth("mall_manager", 1)))
-                .andExpect(status().isForbidden());
+                        .header("Authorization", auth("mall_manager", 2)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].tenant_id").value(hasItem(3)));
     }
 
     @Test
@@ -660,5 +661,89 @@ class RoleSecurityTest {
         mvc.perform(delete("/api/bid-events/3")
                         .header("Authorization", auth("mall_manager", 1)))
                 .andExpect(status().isForbidden());
+    }
+
+    // ---- GET /api/counts ----
+
+    @Test
+    void executiveCountsOverall() throws Exception {
+        mvc.perform(get("/api/counts").param("include", "stores,tenants")
+                        .header("Authorization", auth("executive", 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stores").value(10))
+                .andExpect(jsonPath("$.tenants").value(4))
+                .andExpect(jsonPath("$.employees").doesNotExist());
+    }
+
+    @Test
+    void executiveCountsAllMetricsByDefault() throws Exception {
+        mvc.perform(get("/api/counts").header("Authorization", auth("executive", 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.employees").isNumber())
+                .andExpect(jsonPath("$.products").isNumber());
+    }
+
+    @Test
+    void managerCountsOwnMallByDefault() throws Exception {
+        mvc.perform(get("/api/counts").param("include", "stores,tenants")
+                        .header("Authorization", auth("mall_manager", 1)))
+                .andExpect(jsonPath("$.stores").value(6))
+                .andExpect(jsonPath("$.tenants").value(4));
+        mvc.perform(get("/api/counts").param("include", "stores,tenants")
+                        .header("Authorization", auth("mall_manager", 2)))
+                .andExpect(jsonPath("$.stores").value(2))
+                .andExpect(jsonPath("$.tenants").value(1));
+    }
+
+    @Test
+    void managerCannotCountAnotherMall() throws Exception {
+        mvc.perform(get("/api/counts").param("mallId", "2")
+                        .header("Authorization", auth("mall_manager", 1)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void groupByMallMatchesOverallAndListsEveryMall() throws Exception {
+        String grouped = mvc.perform(get("/api/counts").param("groupBy", "mall")
+                        .header("Authorization", auth("executive", 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].mall_id").value(1))
+                .andReturn().getResponse().getContentAsString();
+        String overall = mvc.perform(get("/api/counts").header("Authorization", auth("executive", 1)))
+                .andReturn().getResponse().getContentAsString();
+        for (String metric : new String[]{"stores", "employees"}) {
+            int sum = JsonPath.<java.util.List<Number>>read(grouped, "$[*]." + metric)
+                    .stream().mapToInt(Number::intValue).sum();
+            org.junit.jupiter.api.Assertions.assertEquals(
+                    ((Number) JsonPath.read(overall, "$." + metric)).intValue(), sum, metric);
+        }
+    }
+
+    @Test
+    void managerCannotGroupByMall() throws Exception {
+        mvc.perform(get("/api/counts").param("groupBy", "mall")
+                        .header("Authorization", auth("mall_manager", 1)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void badCountParamsAre400() throws Exception {
+        mvc.perform(get("/api/counts").param("include", "bogus")
+                        .header("Authorization", auth("executive", 1)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/counts").param("groupBy", "x")
+                        .header("Authorization", auth("executive", 1)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/counts").param("groupBy", "mall").param("mallId", "1")
+                        .header("Authorization", auth("executive", 1)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void otherRolesCannotCount() throws Exception {
+        for (String role : new String[]{"customer", "tenant", "shop_manager"}) {
+            mvc.perform(get("/api/counts").header("Authorization", auth(role, 1)))
+                    .andExpect(status().isForbidden());
+        }
     }
 }

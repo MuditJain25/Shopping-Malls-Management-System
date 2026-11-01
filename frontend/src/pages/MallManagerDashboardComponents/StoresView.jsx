@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Link2 } from 'lucide-react';
 import { PageHeader, Badge, LoadingSpinner, ErrorState } from '@/components/ui/index.jsx';
 import Modal from '@/components/ui/Modal.jsx';
-import { apiGetStoresByMall, apiGetEmployeesByMall, apiGetTenants, apiCreateStore, apiDeleteStore } from '@/lib/api.js';
+import { apiGetStoresByMall, apiGetEmployeesByMall, apiGetTenants, apiCreateStore, apiDeleteStore, apiLinkTenantStore, apiUnlinkTenantStore } from '@/lib/api.js';
 
 const EMPTY_FORM = { store_name: '', shop_number: '', floor: '', area_sqft: '', listing_media: '' };
 
@@ -16,6 +16,11 @@ export default function StoresView({ mallId }) {
   const [storeToDelete, setStoreToDelete] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [allTenants, setAllTenants] = useState([]);
+  const [tenantStoreId, setTenantStoreId] = useState(null);
+  const [linkTenantId, setLinkTenantId] = useState('');
+  const [linkError, setLinkError] = useState(null);
+  const [linkBusy, setLinkBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,9 +29,10 @@ export default function StoresView({ mallId }) {
       apiGetStoresByMall(mallId),
       apiGetEmployeesByMall(mallId),
       apiGetTenants(mallId),
+      apiGetTenants(),
     ])
-      .then(([mallStores, mallEmps, mallTenants]) => {
-        if (!cancelled) { setStores(mallStores); setEmployees(mallEmps); setTenants(mallTenants); }
+      .then(([mallStores, mallEmps, mallTenants, everyTenant]) => {
+        if (!cancelled) { setStores(mallStores); setEmployees(mallEmps); setTenants(mallTenants); setAllTenants(everyTenant); }
       })
       .catch(err => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
@@ -63,6 +69,26 @@ export default function StoresView({ mallId }) {
       setStoreToDelete(null);
     }
   };
+
+  const runLink = async (call) => {
+    setLinkError(null);
+    setLinkBusy(true);
+    try {
+      await call();
+      setLinkTenantId('');
+      setRefresh(r => r + 1);
+    } catch (e) {
+      setLinkError(e.message);
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
+  const closeTenants = () => { setTenantStoreId(null); setLinkTenantId(''); setLinkError(null); };
+
+  const managedStore = stores?.find(s => s.store_id === tenantStoreId);
+  const linkedTenants = allTenants.filter(t => t.store_ids.includes(tenantStoreId));
+  const linkableTenants = allTenants.filter(t => !t.store_ids.includes(tenantStoreId));
 
   if (error) return <ErrorState message={error} />;
   if (!stores) return <LoadingSpinner label="Loading stores..." />;
@@ -102,6 +128,7 @@ export default function StoresView({ mallId }) {
                     <span className="font-medium text-slate-700">{empCount}</span>
                   </div>
                 </div>
+                <button onClick={() => setTenantStoreId(store.store_id)} className="btn-secondary text-xs w-full mt-3"><Link2 size={14} /> Manage tenants</button>
               </div>
             </div>
           );
@@ -119,6 +146,34 @@ export default function StoresView({ mallId }) {
           <div><label className="label">Image URL</label><input className="input" value={form.listing_media} onChange={e => setForm({ ...form, listing_media: e.target.value })} placeholder="https://…" /></div>
           {actionError && <ErrorState message={actionError} />}
           <button onClick={handleCreate} className="btn-primary w-full">Create Store</button>
+        </div>
+      </Modal>
+
+      <Modal open={tenantStoreId !== null} onClose={closeTenants} title={`Tenants — ${managedStore?.store_name ?? ''}`} size="md">
+        <div className="space-y-4">
+          <div>
+            <label className="label">Linked tenants</label>
+            {linkedTenants.length === 0 && <p className="text-sm text-slate-400">No tenants linked.</p>}
+            <div className="space-y-2">
+              {linkedTenants.map(t => (
+                <div key={t.tenant_id} className="flex items-center justify-between text-sm">
+                  <span><span className="font-medium text-slate-700">{t.business_name}</span> <span className="text-xs text-slate-400">{t.business_type}</span></span>
+                  <button disabled={linkBusy} onClick={() => runLink(() => apiUnlinkTenantStore(t.tenant_id, tenantStoreId))} className="btn-secondary text-xs">Unlink</button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="label">Link a tenant</label>
+            <div className="flex gap-2">
+              <select className="input" value={linkTenantId} onChange={e => setLinkTenantId(e.target.value)}>
+                <option value="">Select tenant…</option>
+                {linkableTenants.map(t => <option key={t.tenant_id} value={t.tenant_id}>{t.business_name}</option>)}
+              </select>
+              <button disabled={!linkTenantId || linkBusy} onClick={() => runLink(() => apiLinkTenantStore(linkTenantId, tenantStoreId))} className="btn-primary text-sm">Link</button>
+            </div>
+          </div>
+          {linkError && <ErrorState message={linkError} />}
         </div>
       </Modal>
 

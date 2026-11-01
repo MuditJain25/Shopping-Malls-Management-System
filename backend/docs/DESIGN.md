@@ -368,7 +368,8 @@ Pagination: every `GET` list supports `?page=&size=&sort=` (see §11) — **exce
 | POST | `/bid-events/{id}/bids` | `{user_id,bid_amount,bidder_name}` | `Bid 201` | customer+ | server validates increment, flips prev winning→outbid atomically |
 | PUT | `/bid-events/{id}/finalize` | `{final_allocation}` | `BidEvent` | mall_manager | string accepted, not persisted (see §6-D10); sets `status=finalized`, `final_allocation=true`; 409 if already finalized |
 | DELETE | `/bid-events/{id}` | — | `204` | mall_manager,exec | **added**; `409` if the event already has bids |
-| GET | `/tenants` | `?mallId=` | `Tenant[]` | exec,mall_manager | `mallId` filters via store join |
+| GET | `/tenants` | `?mallId=` | `Tenant[]` | exec,mall_manager | not scoped to the caller's mall (tenants are system-level); `mallId` is an optional filter via store join |
+| GET | `/counts` | `?mallId=&include=tenants,stores,employees,products&groupBy=mall` | `{tenants,stores,…}` or `[{mall_id,…}]` | exec,mall_manager | counted in SQL; `include` defaults to all four. Exec: overall, `mallId`, or `groupBy=mall` (one row per mall, zero-malls included, not combinable with `mallId`). Manager: own mall only, no `groupBy`. tenants = distinct tenants linked to a store; products per mall = distinct products sold by its stores |
 | GET | `/tenants/{id}` | — | `Tenant` | auth | |
 | POST | `/tenants` | `{business_name,business_type,email,phone_number}` | `Tenant 201` | mall_manager,exec | **added**; inserts the tenant only, no store links |
 | PUT | `/tenants/{id}` | same 4 fields | `Tenant` | tenant(self),mall_manager,exec | **added**; does not touch store links |
